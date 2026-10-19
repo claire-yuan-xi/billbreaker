@@ -7,14 +7,15 @@ import re
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from ..config import settings
 from ..services import analysis_cache
 from ..services.bill_sources import fetch_bill_text
 from ..services.explain import breakdown
 from ..services.rate_limit import bump, client_ip
 from ..services.render import render_section
+from ..services.research import research_breakdown
 from ..services.sanitize import sanitize_bill_text
-from ..validation import BILL_NO, US_STATES
+from ..states import STATE_NAMES
+from ..validation import US_STATES, normalize_bill_no
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -47,13 +48,18 @@ MESSAGES = {
     "AI_BAD_KEY": "Gemini says the key on the server is not valid.",
     "AI_FORBIDDEN": "Gemini refused the key on the server (403).",
     "AI_TIMEOUT": "The AI took too long on this bill. Try again.",
+    "NOT_FOUND": "Could not find this bill. Check the number, or paste its text on the Paste tab.",
 }
 # Retrying these at once in JSON mode cannot help and only spends quota.
-NO_RETRY = {"RATE_LIMIT", "AI_NO_KEY", "AI_BAD_KEY", "AI_FORBIDDEN"}
+NO_RETRY = {"RATE_LIMIT", "AI_NO_KEY", "AI_BAD_KEY", "AI_FORBIDDEN", "NOT_FOUND"}
 
 
 def _friendly(code: str) -> str:
     return MESSAGES.get(code, f"AI analysis failed ({code}). Try again.")
+
+
+class NotFound(Exception):
+    code = "NOT_FOUND"
 
 
 async def _save_quietly(*args) -> None:
@@ -70,7 +76,8 @@ async def explain_bill(request: Request):
     except ValueError:
         body = {}
     state = str(body.get("state") or "US").upper()[:4]
-    bill_no = str(body.get("billNo") or "")[:40]
+    raw_bill_no = str(body.get("billNo") or "")[:40]
+    bill_no = normalize_bill_no(raw_bill_no) if raw_bill_no.strip() else ""
     text = str(body.get("text") or "")
     as_json = body.get("mode") == "json"
 
@@ -83,30 +90,24 @@ async def explain_bill(request: Request):
 
     if state not in US_STATES:
         return error(400, "Invalid state")
-    if bill_no and not BILL_NO.match(bill_no):
+    if bill_no is None:
         return error(400, "Invalid bill number")
     if len(text) > MAX_TEXT:
         return error(413, "Bill text too long")
 
     source_url = source = None
     tried: list[str] = []
+    research = False
     if len(text.strip()) < MIN_PASTED:
         if not bill_no:
-            return error(400, "Paste the bill text on the Paste tab to analyze a non-federal bill.")
+            return error(400, "Paste the bill text on the Paste tab to analyze it.")
         fetched = await fetch_bill_text(state, bill_no)
         tried = fetched.tried
-        if not fetched.text:
-            note = (
-                " OpenStates is not configured for state legislation, so paste the bill text on the Paste tab."
-                if state != "US" and not settings.openstates_api_key
-                else ""
-            )
-            label = " then ".join(tried) or "no sources"
-            return error(
-                502,
-                f"Could not auto-fetch this bill (tried: {label}).{note} Paste the full text on the Paste tab.",
-            )
-        text, source_url, source = fetched.text, fetched.source_url, fetched.source
+        if fetched.text:
+            text, source_url, source = fetched.text, fetched.source_url, fetched.source
+        else:
+            # No official text reachable: Gemini looks the bill up with Google Search instead.
+            research, source, text = True, "web", f"research:{state}:{bill_no}"
 
     text_hash = analysis_cache.hash_text(text)
     cache_bill = bill_no or f"paste-{text_hash[:8]}"
@@ -140,7 +141,8 @@ async def explain_bill(request: Request):
         if not rl.allowed:
             return error(429, message, {"Retry-After": str(rl.retry_after)})
 
-    bill = sanitize_bill_text(text)
+    bill = "" if research else sanitize_bill_text(text)
+    jurisdiction = "US federal" if state == "US" else STATE_NAMES.get(state, state)
     safe_state = re.sub(r"[^A-Z]", "", state)
     safe_bill = re.sub(r"[^A-Za-z0-9.\-\s]", "", bill_no)
     identifier = f"{safe_state} {safe_bill}".strip() or "Pasted bill"
@@ -158,9 +160,18 @@ async def explain_bill(request: Request):
         reason = "rate_limited" if code == "RATE_LIMIT" else "ai_unavailable"
         return payload, {"cached": True, "cached_at": created_at, "cached_reason": reason}
 
+    async def analyze() -> tuple[str, list[dict]]:
+        if not research:
+            return await breakdown(bill, identifier)
+        found = await research_breakdown(jurisdiction, bill_no, identifier)
+        if not found:
+            raise NotFound()
+        title, sections, _pages = found
+        return title, sections
+
     if as_json:
         try:
-            title, sections = await breakdown(bill, identifier)
+            title, sections = await analyze()
         except Exception as exc:  # noqa: BLE001 - every failure falls back to the last good analysis
             code = getattr(exc, "code", type(exc).__name__)
             log.error("json pipeline error: %s", code)
@@ -174,9 +185,10 @@ async def explain_bill(request: Request):
         return JSONResponse(_flat(payload, cached=False, **source_meta), headers={"Cache-Control": "no-store"})
 
     async def stream():
-        yield sse("status", {"stage": "breakdown", "message": "Reading the bill and writing the breakdown"})
+        message = "Looking up the bill and writing the breakdown" if research else "Reading the bill and writing the breakdown"
+        yield sse("status", {"stage": "breakdown", "message": message})
         try:
-            title, sections = await breakdown(bill, identifier)
+            title, sections = await analyze()
         except Exception as exc:  # noqa: BLE001
             code = getattr(exc, "code", type(exc).__name__)
             log.error("sse pipeline error: %s", code)

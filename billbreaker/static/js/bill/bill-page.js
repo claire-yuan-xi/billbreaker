@@ -103,7 +103,8 @@ export function initBillPage(page) {
     }
     if (p.source) {
       const note = q("[data-source-note]");
-      note.textContent = p.source ? `Text from ${SOURCE_LABELS[p.source] ?? p.source}` : "";
+      note.textContent =
+        p.source === "web" ? "Looked up on the web" : `Text from ${SOURCE_LABELS[p.source] ?? p.source}`;
       note.classList.remove("hidden");
     }
     if (number && model.title) saveRecent({ state, number, title: model.title, ts: Date.now() });

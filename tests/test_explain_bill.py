@@ -29,7 +29,7 @@ def test_rejects_oversize_text(client):
 
 
 def test_serves_the_cache_as_sse_without_auth(client):
-    asyncio.run(analysis_cache.save("US", "HR1", analysis_cache.hash_text(TEXT), "Cached", None, [{"event": "quick_take", "data": QUICK}]))
+    asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(TEXT), "Cached", None, [{"event": "quick_take", "data": QUICK}]))
     res = post(client)
     assert res.status_code == 200
     assert res.headers["content-type"].startswith("text/event-stream")
@@ -37,7 +37,7 @@ def test_serves_the_cache_as_sse_without_auth(client):
 
 
 def test_serves_the_cache_as_json_with_rendered_html(client):
-    asyncio.run(analysis_cache.save("US", "HR1", analysis_cache.hash_text(TEXT), "Cached bill", "https://example", [{"event": "quick_take", "data": QUICK}]))
+    asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(TEXT), "Cached bill", "https://example", [{"event": "quick_take", "data": QUICK}]))
     body = post(client, mode="json").json()
     assert body["title"] == "Cached bill"
     assert body["cached"] is True
@@ -65,7 +65,7 @@ def test_rate_limit_fails_closed_when_the_store_errors(client, monkeypatch):
 
 def test_falls_back_to_the_last_analysis_when_ai_fails(client):
     other = "w" * 300
-    asyncio.run(analysis_cache.save("US", "HR1", analysis_cache.hash_text(other), "Old title", "https://old", [{"event": "quick_take", "data": QUICK}]))
+    asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(other), "Old title", "https://old", [{"event": "quick_take", "data": QUICK}]))
     body = post(client, mode="json").json()
     assert body["cached"] is True
     assert body["title"] == "Old title"
@@ -104,7 +104,34 @@ def test_fetches_the_text_when_none_is_pasted(client, monkeypatch):
         return FetchResult(TEXT, "https://www.congress.gov/x", "congress.gov", ["congress.gov"])
 
     monkeypatch.setattr(explain_api, "fetch_bill_text", fake_fetch)
-    asyncio.run(analysis_cache.save("US", "HR1", analysis_cache.hash_text(TEXT), "Fetched", None, [{"event": "quick_take", "data": QUICK}]))
+    asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(TEXT), "Fetched", None, [{"event": "quick_take", "data": QUICK}]))
     body = post(client, text="", mode="json").json()
     assert body["title"] == "Fetched"
     assert body["source"] == "congress.gov"
+
+
+def test_a_state_bill_with_no_text_is_looked_up_on_the_web(client, monkeypatch):
+    async def no_text(state, bill_no):
+        return FetchResult(None, None, None, ["openstates"])
+
+    async def lookup(jurisdiction, bill_no, fallback):
+        assert (jurisdiction, bill_no) == ("Texas", "HB 12")
+        return "Texas bill", [{"event": "quick_take", "data": QUICK}], []
+
+    monkeypatch.setattr(explain_api, "fetch_bill_text", no_text)
+    monkeypatch.setattr(explain_api, "research_breakdown", lookup)
+    res = client.post("/api/explain-bill", json={"state": "TX", "billNo": "H.B. 12"})
+    assert "Texas bill" in res.text and '"source": "web"' in res.text and "event: done" in res.text
+
+
+def test_a_bill_the_web_cannot_find_says_so(client, monkeypatch):
+    async def no_text(state, bill_no):
+        return FetchResult(None, None, None, ["openstates"])
+
+    async def missing(jurisdiction, bill_no, fallback):
+        return None
+
+    monkeypatch.setattr(explain_api, "fetch_bill_text", no_text)
+    monkeypatch.setattr(explain_api, "research_breakdown", missing)
+    body = client.post("/api/explain-bill", json={"state": "OH", "billNo": "HB 99999", "mode": "json"}).json()
+    assert "Could not find this bill" in body["error"]

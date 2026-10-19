@@ -9,7 +9,7 @@ from fastapi.staticfiles import StaticFiles
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from . import pages
-from .api import admin, bills, explain, news, watchlist
+from .api import admin, bills, explain, news, status, watchlist
 from .security import SecurityHeaders
 from .templating import HERE, templates
 
@@ -21,7 +21,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Bill Breaker", docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(SecurityHeaders)
     app.mount("/static", StaticFiles(directory=HERE / "static"), name="static")
-    for module in (pages, news, bills, explain, watchlist, admin):
+    for module in (pages, news, bills, explain, watchlist, admin, status):
         app.include_router(module.router)
 
     def wants_html(request: Request) -> bool:

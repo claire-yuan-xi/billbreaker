@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field, field_validator
 from ..services import shares
 from ..services.bill_sources import official_search_url
 from ..services.rate_limit import bump, client_ip
-from ..validation import BILL_NO, STATE
+from ..validation import STATE, normalize_bill_no
 
 router = APIRouter()
 
@@ -26,19 +26,20 @@ class MetaIn(BaseModel):
     @field_validator("billNo")
     @classmethod
     def _bill(cls, v: str) -> str:
-        if v and not BILL_NO.match(v):
+        if not v.strip():
+            return ""
+        normalized = normalize_bill_no(v)
+        if not normalized:
             raise ValueError("invalid bill number")
-        return v
+        return normalized
 
 
 @router.post("/api/bill-meta")
 async def bill_meta(data: MetaIn):
     state, bill_no = data.state, data.billNo
     source_url = official_search_url(state, bill_no)
+    # The analysis fetches the text itself, or looks the bill up on the web.
     notice = None
-    # Federal text is fetched by the analysis itself, which also tries GovInfo.
-    if not data.hasText and bill_no and state != "US":
-        notice = "State bill text cannot be fetched automatically. Paste it on the Paste tab."
     return {
         "id": f"{state} {bill_no}".strip() if bill_no else "pasted bill",
         "jurisdiction": state,
@@ -58,7 +59,7 @@ class ShareIn(BaseModel):
     @field_validator("bill_no")
     @classmethod
     def _bill(cls, v: str) -> str:
-        if v and not BILL_NO.match(v):
+        if v and not normalize_bill_no(v):
             raise ValueError("invalid bill number")
         return v
 

@@ -4,8 +4,8 @@ import { readProfile, saveProfile } from "../lib/reader-profile.js";
 import { initAboutYou } from "./about-you.js";
 import { initStateCombobox } from "./state-combobox.js";
 
-// Bill number format: 1-5 letters (HB, S, HR, SB), optional space, dot or dash, 1-6 digits.
-const BILL_NO_RE = /^[A-Za-z]{1,5}[.\s-]?\d{1,6}$/;
+// Bill number format: letters (HB, H.B., S, AB), optional space, dot or dash, digits, optional letter.
+const BILL_NO_RE = /^[A-Za-z][A-Za-z.\s]{0,15}?[\s.-]*\d{1,6}[A-Za-z]?$/;
 const MIN_PASTE = 100;
 
 /** "Which bill" then "About you", ending on the bill page. Returns open(mode). */

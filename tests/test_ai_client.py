@@ -20,7 +20,8 @@ def gemini(monkeypatch, set_setting, handler):
     seen = []
 
     def record(request):
-        seen.append(json.loads(request.content)["model"])
+        body = json.loads(request.content)
+        seen.append(body.get("model") or request.url.path.split("/")[-1].split(":")[0])
         return handler(request, len(seen))
 
     monkeypatch.setattr(ai_client, "_transport", httpx.MockTransport(record))
@@ -66,3 +67,45 @@ def test_breakdown_is_one_call_with_every_section(monkeypatch, set_setting):
     assert seen == ["main-model"]
     assert title == "A plain title"
     assert [s["event"] for s in sections] == ["quick_take", "status_quo_diff", "winners_losers", "supporters_vs_critics", "citations"]
+
+
+def test_research_reads_the_json_and_the_pages(monkeypatch, set_setting):
+    from billbreaker.services import research
+
+    data = {"title": "Gig workers", "quick_take": {"tldr": "t"}, "citations": {"citations": []}}
+    answer = {
+        "candidates": [
+            {
+                "content": {"parts": [{"text": "```json\n" + json.dumps(data) + "\n```"}]},
+                "groundingMetadata": {"groundingChunks": [{"web": {"uri": "https://leginfo.ca.gov/x", "title": "ca.gov"}}]},
+            }
+        ]
+    }
+    seen = gemini(monkeypatch, set_setting, lambda req, n: httpx.Response(200, json=answer))
+    title, sections, pages = asyncio.run(research.research_breakdown("California", "AB 5", "CA AB 5"))
+    assert seen == ["main-model"]
+    assert title == "Gig workers"
+    assert [s["event"] for s in sections] == ["quick_take", "citations"]
+    assert pages == [{"url": "https://leginfo.ca.gov/x", "title": "ca.gov"}]
+
+
+def test_research_reports_a_missing_bill(monkeypatch, set_setting):
+    from billbreaker.services import research
+
+    answer = {"candidates": [{"content": {"parts": [{"text": "NOT_FOUND"}]}}]}
+    gemini(monkeypatch, set_setting, lambda req, n: httpx.Response(200, json=answer))
+    assert asyncio.run(research.research_breakdown("Texas", "HB 99999", "TX HB 99999")) is None
+
+
+def test_the_native_call_sends_the_key_header_only(monkeypatch, set_setting):
+    from billbreaker.services import research
+
+    headers = []
+
+    def handler(req, n):
+        headers.append(req.headers)
+        return httpx.Response(200, json={"candidates": [{"content": {"parts": [{"text": "NOT_FOUND"}]}}]})
+
+    gemini(monkeypatch, set_setting, handler)
+    asyncio.run(research.research_breakdown("Texas", "HB 1", "TX HB 1"))
+    assert headers[0]["x-goog-api-key"] == "test-key" and "authorization" not in headers[0]
