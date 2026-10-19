@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% set name = row.title or (row.state ~ " " ~ row.bill_no) %}
+{% block title %}Bill Breaker | {{ name }}{% endblock %}
+{% block description %}{% if row.title %}Plain-English breakdown of {{ row.title }}{% else %}Plain-English bill analysis.{% endif %}{% endblock %}
+{% block og_type %}article{% endblock %}
+{% block vendor %}{% endblock %}
+{% block body %}
+<main class="min-h-screen bg-[#faf8f3] text-[#1a1a1a]">
+  <header class="border-b border-[#d6d3ca]">
+    <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-6">
+      <a href="/" class="font-serif text-2xl">Bill Breaker</a>
+      <span class="font-serif text-xs text-[#7a766c]">Shared analysis</span>
+    </div>
+  </header>
+  <article class="mx-auto max-w-3xl px-6 py-16">
+    <div class="text-[11px] uppercase tracking-[0.25em] text-[#7a766c]">{{ row.state }} &middot; {{ row.bill_no }}</div>
+    <h1 class="mt-5 font-serif text-5xl leading-[1.05] md:text-6xl">{{ name }}</h1>
+    <div class="mt-4 flex flex-wrap gap-x-6 font-serif text-xs text-[#3a3a3a]">
+      {% if row.source_url %}
+        {% if is_safe_external_url(row.source_url) %}
+        <a href="{{ row.source_url }}" target="_blank" rel="noopener noreferrer nofollow" title="Opens {{ host_of(row.source_url) }} in a new tab" class="underline underline-offset-4">Open official source &#8599;</a>
+        {% else %}
+        <span role="link" aria-disabled="true" title="Link blocked, host is not on the verified source allowlist." class="cursor-not-allowed line-through decoration-dotted opacity-55">Source unavailable</span>
+        {% endif %}
+      {% endif %}
+      <a href="/bill?state={{ row.state | urlencode }}&amp;number={{ row.bill_no | urlencode }}" class="underline underline-offset-4">Run your own analysis &rarr;</a>
+    </div>
+    {% for section in sections %}{{ section | safe }}{% endfor %}
+  </article>
+</main>
+{% endblock %}

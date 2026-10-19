@@ -1,0 +1,15 @@
+{# The saved list as a right-hand panel, opened from the header from anywhere on the page. #}
+<dialog data-saved-sheet aria-labelledby="sheet-title" class="sheet m-0 ml-auto h-full max-h-none w-full max-w-none border-l border-border bg-background p-0 text-foreground sm:max-w-md">
+  <div class="flex h-full flex-col overflow-y-auto p-6">
+    <div class="flex items-start justify-between">
+      <h2 id="sheet-title" class="font-serif text-3xl font-bold">Saved bills</h2>
+      <button type="button" data-dialog-close aria-label="Close" class="text-muted-foreground hover:text-foreground">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+    <div data-notice role="status" aria-live="polite"></div>
+    <div data-saved-empty class="mt-4">{% include "partials/saved_empty.html" %}</div>
+    <ul data-saved-grid data-compact class="group/grid mt-2 grid gap-3"></ul>
+    <a href="#saved" data-sheet-backup class="mt-auto pt-4 text-[11px] uppercase tracking-[0.2em] text-muted-foreground underline underline-offset-4 hover:text-foreground">Back up &amp; restore</a>
+  </div>
+</dialog>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}BillBreaker | Legislation in plain English{% endblock %}
+{% block description %}Live legislation headlines from AP News. Search a bill by state and number, or paste the text, to get a plain-English breakdown of how it affects you.{% endblock %}
+{% block vendor %}
+{{ super() }}
+<script src="{{ url_for('static', path='vendor/lenis.min.js') }}" defer></script>
+{% endblock %}
+{% block body %}
+<main class="min-h-screen bg-background text-foreground">
+  <a href="#news" class="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[60] focus:bg-background focus:px-4 focus:py-2">Skip to news</a>
+
+  <div class="fixed inset-x-0 top-0 z-50">
+    {% include "partials/ticker.html" %}
+    {% include "partials/site_header.html" %}
+  </div>
+
+  <div id="hero">{% include "partials/hero.html" %}</div>
+  {% include "partials/news_section.html" %}
+  {% include "partials/recent_bills.html" %}
+  {% include "partials/saved_section.html" %}
+  {% include "partials/search_cta.html" %}
+  {% include "partials/bill_drift.html" %}
+  {% include "partials/floating_explain.html" %}
+  {% include "partials/search_dialog.html" %}
+  {% include "partials/saved_sheet.html" %}
+  {% include "partials/item_templates.html" %}
+</main>
+{% endblock %}
+{% block scripts %}
+<script type="module" src="{{ url_for('static', path='js/pages/index.js') }}"></script>
+{% endblock %}

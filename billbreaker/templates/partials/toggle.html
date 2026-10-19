@@ -1,0 +1,8 @@
+{# A segmented control. news/controls.js keeps aria-pressed in sync. #}
+<div class="flex items-center gap-3">
+  <div class="inline-flex border border-border" role="group" aria-label="{{ label }}" data-toggle="{{ name }}">
+    {% for value, text in options %}
+    <button type="button" data-value="{{ value }}" aria-pressed="{{ 'true' if value == current else 'false' }}" class="px-3 py-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground transition-[color,background-color,transform] duration-150 hover:text-foreground active:scale-90 aria-pressed:bg-foreground aria-pressed:text-background aria-pressed:hover:text-background">{{ text }}</button>
+    {% endfor %}
+  </div>
+</div>

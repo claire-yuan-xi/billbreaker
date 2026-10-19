@@ -1,0 +1,22 @@
+{# Every sentence of the personalized explanation, marked by how well the sources back it. #}
+<div>
+  <div class="mb-4 flex flex-wrap items-baseline gap-x-6 gap-y-1 text-sm">
+    <span class="font-serif text-2xl font-bold">{{ serious }} of {{ report.claims | length }}</span>
+    <span class="text-muted-foreground">sentences need review before a reader sees them</span>
+  </div>
+  <ol class="space-y-2">
+    {% for c in report.claims %}
+    {% set bad = c.flags | select("in", serious_flags) | list %}
+    <li class="border-l-4 py-2 pl-4 text-sm leading-relaxed {% if bad %}border-[#c0392b] bg-[#c0392b]/5{% elif c.flags %}border-[#b7791f] bg-[#b7791f]/5{% else %}border-border{% endif %}">
+      <p>{{ c.text }}</p>
+      <div class="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+        <span class="tabular-nums">{{ (c.support * 100) | round | int }}% of words in sources</span>
+        {% for f in c.flags %}
+        <span class="border px-1.5 py-0.5 uppercase tracking-[0.15em] {% if f in serious_flags %}border-[#c0392b] text-[#c0392b]{% else %}border-[#b7791f] text-[#8a5a12]{% endif %}">{{ flag_labels[f] }}</span>
+        {% endfor %}
+        {% if c.flags and c.unsupported %}<span>not in sources: {{ c.unsupported[:6] | join(", ") }}</span>{% endif %}
+      </div>
+    </li>
+    {% endfor %}
+  </ol>
+</div>

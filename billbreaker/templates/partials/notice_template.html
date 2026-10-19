@@ -1,0 +1,11 @@
+<template id="tpl-notice">
+  <div class="mt-6 flex items-center justify-between gap-4 border-l-2 border-accent bg-background px-4 py-3 text-sm shadow-sm">
+    <span data-slot="text"></span>
+    <span class="flex items-center gap-3">
+      <button type="button" data-slot="undo" class="hidden text-[11px] font-medium uppercase tracking-[0.2em] underline underline-offset-4 hover:text-accent">Undo</button>
+      <button type="button" data-slot="dismiss" aria-label="Dismiss message" class="text-muted-foreground hover:text-foreground">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </span>
+  </div>
+</template>

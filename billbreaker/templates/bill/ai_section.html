@@ -1,0 +1,13 @@
+<div data-ai class="mt-16 hidden border-t border-[#d6d3ca] pt-10">
+  <div class="text-sm font-semibold text-[#3a3a3a]">AI breakdown</div>
+  <h2 class="mt-2 font-serif text-4xl">The plain-English read</h2>
+  <div data-ai-status role="status" aria-live="polite" class="mt-8 hidden items-center gap-4 border border-[#1a1a1a] bg-[#f3efe4] px-5 py-5 font-serif">
+    <span aria-hidden="true" class="inline-block h-6 w-6 shrink-0 animate-spin rounded-full border-2 border-[#d6d3ca] border-t-[#1a1a1a]"></span>
+    <span data-ai-status-text class="text-lg text-[#1a1a1a]"></span>
+    <span data-ai-elapsed class="ml-auto text-sm tabular-nums text-[#3a3a3a]"></span>
+  </div>
+  <div data-ai-error class="mt-6 hidden border-b border-t border-[#c4413a] py-4 font-serif text-sm text-[#c4413a]"></div>
+  <div data-ai-blocks>
+    {% for event in ["quick_take", "status_quo_diff", "winners_losers", "supporters_vs_critics", "citations"] %}<div data-block="{{ event }}"></div>{% endfor %}
+  </div>
+</div>

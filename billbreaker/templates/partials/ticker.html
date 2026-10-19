@@ -1,0 +1,13 @@
+{# Live headline bar. news/ticker.js fills it once the feed arrives. #}
+<div data-ticker class="marquee-pause overflow-hidden border-b border-border bg-background/95 backdrop-blur">
+  <div data-ticker-status class="px-6 py-2.5 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">loading live headlines</div>
+  <div data-ticker-live class="hidden items-center">
+    <div class="flex shrink-0 items-center gap-2 bg-foreground px-4 py-2.5 text-[10px] uppercase tracking-[0.25em] text-background">
+      <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-accent"></span>
+      live · ap news
+    </div>
+    <div class="min-w-0 overflow-hidden">
+      <div data-ticker-track class="flex w-max animate-marquee whitespace-nowrap"></div>
+    </div>
+  </div>
+</div>

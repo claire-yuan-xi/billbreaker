@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}BillBreaker | Bill breakdown{% endblock %}
+{% block description %}Read a plain-English bill summary, compare current law, and explore supporters and critics.{% endblock %}
+{% block body %}
+<main data-bill-page data-state="{{ state }}" data-number="{{ number }}" class="min-h-screen bg-[#faf8f3] text-[#1a1a1a]">
+  <header class="border-b border-[#d6d3ca]">
+    <div class="mx-auto flex max-w-3xl items-center justify-between px-6 py-6">
+      <a href="/" class="flex items-baseline gap-2 font-serif"><span class="text-2xl">Bill Breaker</span><span class="text-xs text-[#7a766c]">vol. I</span></a>
+      <a href="/" class="font-serif text-xs text-[#3a3a3a] underline-offset-4 hover:underline">&larr; Return to index</a>
+    </div>
+  </header>
+
+  <div class="mx-auto max-w-3xl px-6 py-16">
+    <div data-meta-error class="hidden border-b border-t border-[#c4413a] py-6 font-serif text-sm text-[#c4413a]">
+      Could not load this bill. <button type="button" data-meta-retry class="underline">Try again.</button>
+    </div>
+    {% include "bill/header.html" %}
+    {% include "bill/reader_strip.html" %}
+    <div data-meta-notice class="mt-10 hidden border-b border-t border-[#d6d3ca] py-5 font-serif text-base leading-relaxed text-[#3a3a3a]"></div>
+    {% include "bill/ai_section.html" %}
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script type="module" src="{{ url_for('static', path='js/pages/bill.js') }}"></script>
+{% endblock %}

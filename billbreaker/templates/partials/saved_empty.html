@@ -1,0 +1,14 @@
+<div class="@container border border-dashed border-foreground/30 bg-background/60">
+  <div class="flex flex-col items-start gap-5 p-6 @2xl:flex-row @2xl:items-center @2xl:justify-between @2xl:p-8">
+    <div class="flex items-start gap-4">
+      <span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent/20 text-accent">
+        <svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m19 21-7-4-7 4V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v16z"/></svg>
+      </span>
+      <div class="min-w-0">
+        <p class="font-serif text-2xl font-bold">Nothing saved yet</p>
+        <p class="mt-1 max-w-md text-sm leading-relaxed text-muted-foreground">Open a bill and press <strong class="text-foreground">Save bill</strong></p>
+      </div>
+    </div>
+    <button type="button" data-open-search="number" data-press class="relative shrink-0 overflow-hidden bg-foreground px-6 py-3.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-background hover:bg-foreground/85">Find a bill <span data-press-arrow class="inline-block">&rarr;</span></button>
+  </div>
+</div>

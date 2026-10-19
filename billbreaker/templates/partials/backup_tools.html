@@ -1,0 +1,44 @@
+{# Backup and restore for saved bills. saved/backup.js wires the buttons. #}
+{% set tool = "flex items-start gap-3 border border-border bg-background p-4 text-left hover:border-foreground disabled:cursor-not-allowed disabled:opacity-50" %}
+<div class="border border-border bg-background/70 p-5">
+  <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+    <button type="button" data-backup="download" data-needs-items class="{{ tool }}">
+      <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" x2="12" y1="15" y2="3"/></svg>
+      <span><span class="block text-sm font-medium">Download backup</span><span class="block text-xs text-muted-foreground">Save a .json file</span></span>
+    </button>
+    <button type="button" data-backup="copy" data-needs-items class="{{ tool }}">
+      <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect width="8" height="4" x="8" y="2" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/></svg>
+      <span><span class="block text-sm font-medium">Copy backup</span><span class="block text-xs text-muted-foreground">To your clipboard</span></span>
+    </button>
+    <button type="button" data-backup="restore" class="{{ tool }}">
+      <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" x2="12" y1="3" y2="15"/></svg>
+      <span><span class="block text-sm font-medium">Restore from file</span><span class="block text-xs text-muted-foreground">Merges with what's here</span></span>
+    </button>
+    <button type="button" data-backup="clear" data-needs-items class="{{ tool }} hover:border-destructive hover:text-destructive">
+      <svg class="mt-0.5 h-4 w-4 shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+      <span><span class="block text-sm font-medium">Clear all</span><span class="block text-xs text-muted-foreground">Asks before deleting</span></span>
+    </button>
+    <input type="file" data-backup-file accept="application/json,.json" class="hidden" />
+  </div>
+
+  <div class="mt-5 border-t border-border pt-5">
+    <div class="flex items-center gap-2 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+      <svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="7.5" cy="15.5" r="5.5"/><path d="m21 2-9.6 9.6"/><path d="m15.5 7.5 3 3L22 7l-3-3"/></svg>
+      other devices
+    </div>
+    <p data-cloud-off class="mt-2 max-w-2xl text-sm leading-relaxed text-muted-foreground">To move your saved bills to another device, download a backup here and restore it there. Automatic sync with a recovery code turns on once the site's backend is connected.</p>
+    <div data-cloud-on class="mt-3 hidden gap-5 md:grid md:grid-cols-2">
+      <div>
+        <div class="text-sm font-medium">This device's recovery code</div>
+        <div data-device-code class="mt-2 break-all bg-secondary/60 px-3 py-2 font-mono text-xs"></div>
+        <button type="button" data-backup="copy-code" class="mt-3 border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-foreground disabled:opacity-50">Copy code</button>
+        <p class="mt-2 text-xs leading-relaxed text-muted-foreground">Anyone with this code can read and change your cloud copy, so keep it private.</p>
+      </div>
+      <div>
+        <label for="adopt-code" class="text-sm font-medium">Use a code from another device</label>
+        <input id="adopt-code" data-adopt-input placeholder="paste recovery code" spellcheck="false" class="mt-2 w-full border border-border bg-background px-3 py-2 font-mono text-xs" />
+        <button type="button" data-backup="adopt" disabled class="mt-3 border border-border px-3 py-2 text-[11px] uppercase tracking-[0.2em] hover:border-foreground disabled:opacity-50">Link and pull</button>
+      </div>
+    </div>
+  </div>
+</div>

@@ -1,0 +1,24 @@
+<section id="saved" data-saved-section aria-labelledby="saved-title" class="scroll-mt-28 border-b border-border bg-secondary/40">
+  <div class="mx-auto max-w-6xl px-6 py-16">
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <h2 id="saved-title" class="flex items-baseline gap-4 font-serif text-4xl font-bold tracking-tight md:text-5xl">
+        Saved bills
+        <span data-saved-count class="rounded-full bg-accent px-3 py-0.5 font-sans text-sm font-medium text-foreground">0</span>
+      </h2>
+      <div class="flex flex-wrap items-center gap-2">
+        <button type="button" data-open-search="number" data-saved-add data-press class="relative hidden overflow-hidden border border-foreground px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] hover:bg-foreground hover:text-background">+ Add another bill</button>
+        <button type="button" data-saved-tools-toggle data-press aria-expanded="false" aria-controls="saved-tools" class="relative overflow-hidden border border-border bg-background px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] hover:border-foreground">Back up &amp; restore</button>
+      </div>
+    </div>
+
+    <div data-notice role="status" aria-live="polite"></div>
+
+    <div id="saved-tools" data-saved-tools class="mt-6 hidden">{% include "partials/backup_tools.html" %}</div>
+
+    <div class="mt-8">
+      <div data-saved-empty>{% include "partials/saved_empty.html" %}</div>
+      <ul data-saved-grid class="group/grid grid gap-4 sm:grid-cols-2 lg:grid-cols-3"></ul>
+      <button type="button" data-saved-more class="mt-6 hidden text-[11px] uppercase tracking-[0.2em] underline underline-offset-4 hover:text-accent"></button>
+    </div>
+  </div>
+</section>

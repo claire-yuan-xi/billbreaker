@@ -1,0 +1,12 @@
+<div class="mt-8">
+  <p class="font-serif text-2xl leading-[1.4]">{{ data.tldr }}</p>
+  <div class="mt-8 grid grid-cols-1 gap-6 sm:grid-cols-3">
+    {% for label, value, sub in [("Controversy", data.controversy_score ~ "/10", data.controversy_reason), ("Dollar impact", data.dollar_impact, None), ("Timeline", data.timeline, None)] %}
+    <div class="border-t border-[#d6d3ca] pt-4">
+      <div class="text-sm font-semibold text-[#3a3a3a]">{{ label }}</div>
+      <div class="mt-2 font-serif text-xl leading-snug">{{ value }}</div>
+      {% if sub %}<div class="mt-2 font-serif text-xs leading-relaxed text-[#5a5650]">{{ sub }}</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>

@@ -1,0 +1,14 @@
+{# White over the hero photo; turns solid once the hero has scrolled away (data-solid). #}
+<header data-site-header data-solid="false" class="group/nav transition-colors duration-500 data-[solid=true]:border-b data-[solid=true]:border-border data-[solid=true]:bg-background/95 data-[solid=true]:backdrop-blur">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4 text-white group-data-[solid=true]/nav:text-foreground">
+    <a href="/" class="flex items-center gap-2 text-sm font-medium tracking-tight">
+      <span class="inline-block h-2 w-2 bg-white group-data-[solid=true]/nav:bg-foreground"></span>
+      <span>bill_breaker</span>
+    </a>
+    <nav aria-label="Main" class="ml-auto mr-6 hidden items-center text-[11px] font-semibold uppercase tracking-[0.22em] md:flex">
+      <a href="#news" class="opacity-80 hover:opacity-100">News</a>
+    </nav>
+    {% include "partials/saved_button.html" %}
+    <button type="button" data-open-search="number" data-press class="relative overflow-hidden border border-white/80 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] transition-colors hover:bg-white hover:text-[#14171f] group-data-[solid=true]/nav:border-foreground group-data-[solid=true]/nav:hover:bg-foreground group-data-[solid=true]/nav:hover:text-background">Search</button>
+  </div>
+</header>

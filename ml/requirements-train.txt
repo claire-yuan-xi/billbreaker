@@ -1,0 +1,7 @@
+# Local training (ml/train.py). transformers matches ml/space so the saved model loads there.
+torch==2.5.1
+transformers==4.46.3
+datasets==3.1.0
+accelerate==1.1.1
+sentencepiece==0.2.0
+numpy<2.2

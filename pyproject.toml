@@ -1,0 +1,17 @@
+[project]
+name = "billbreaker"
+version = "1.0.0"
+requires-python = ">=3.12"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn[standard]>=0.30",
+  "jinja2>=3.1",
+  "httpx>=0.27",
+  "python-dotenv>=1.0",
+]
+
+[tool.vercel]
+entrypoint = "billbreaker.main:app"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

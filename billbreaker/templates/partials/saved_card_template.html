@@ -1,0 +1,18 @@
+<template id="tpl-saved-card">
+  <li class="group flex flex-col border border-border bg-background p-5 transition duration-300 hover:-translate-y-0.5 hover:border-foreground hover:shadow-[0_14px_30px_-18px_rgba(0,0,0,0.45)]">
+    <div class="flex items-center justify-between gap-3">
+      <span class="flex items-center gap-2">
+        <span data-slot="place" class="bg-foreground px-2 py-1 text-[10px] uppercase tracking-[0.22em] text-background"></span>
+        <span data-slot="number" class="text-sm font-medium tracking-wide"></span>
+      </span>
+      <span data-slot="saved" class="text-[10px] uppercase tracking-[0.2em] text-muted-foreground"></span>
+    </div>
+    <p data-slot="title" class="mt-4 flex-1 font-serif text-2xl font-semibold leading-[1.2] line-clamp-3 group-data-[compact]/grid:line-clamp-2 group-data-[compact]/grid:text-lg"></p>
+    <div class="mt-5 flex items-center gap-2">
+      <a data-slot="open" data-press class="relative flex flex-1 items-center justify-between overflow-hidden bg-foreground px-4 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-background hover:bg-foreground/85">Read breakdown <span aria-hidden="true" data-press-arrow class="inline-block">&rarr;</span></a>
+      <button type="button" data-slot="remove" title="Remove" class="flex h-[42px] w-[42px] items-center justify-center border border-border text-muted-foreground hover:border-destructive hover:text-destructive">
+        <svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg>
+      </button>
+    </div>
+  </li>
+</template>

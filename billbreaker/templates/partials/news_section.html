@@ -1,0 +1,35 @@
+<section id="news" data-news aria-labelledby="news-title" class="relative border-b border-border bg-background">
+  <div class="mx-auto max-w-6xl px-6 pt-20">
+    <div class="flex flex-wrap items-end justify-between gap-6">
+      <div>
+        <h2 id="news-title" class="font-serif text-5xl font-bold tracking-tight md:text-6xl">Today on the floor</h2>
+        <div data-news-count class="sr-only" aria-live="polite"></div>
+      </div>
+      <div class="flex flex-wrap items-center gap-4">
+        {% with name="sort", label="sort", current="newest", options=[("newest", "Newest"), ("oldest", "Oldest")] %}{% include "partials/toggle.html" %}{% endwith %}
+        {% with name="window", label="window", current="all", options=[("24h", "24h"), ("week", "Week"), ("all", "All")] %}{% include "partials/toggle.html" %}{% endwith %}
+        {% with name="view", label="view", current="rail", options=[("rail", "Cards"), ("list", "List")] %}{% include "partials/toggle.html" %}{% endwith %}
+        <button type="button" data-news-refresh aria-label="Refresh headlines" class="border border-border px-3 py-2 text-sm transition-transform duration-150 hover:border-foreground active:scale-90 disabled:opacity-50">
+          <span aria-hidden="true" class="inline-block">&#8635;</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div data-news-empty class="mx-auto max-w-6xl px-6 py-16 text-sm text-muted-foreground">Loading headlines</div>
+
+  <div data-news-rail-wrap class="hidden pb-20 pt-10">
+    <ul data-news-rail tabindex="0" aria-label="AP headlines. Use the arrow keys or scroll sideways." class="news-rail flex gap-5 overflow-x-auto pb-6 focus-visible:outline-none"></ul>
+    <div class="mx-auto mt-4 flex max-w-6xl items-center gap-6 px-6">
+      <div class="h-px flex-1 bg-border" aria-hidden="true">
+        <div data-news-bar class="h-px origin-left scale-x-[0.06] bg-foreground"></div>
+      </div>
+      <div class="flex gap-2">
+        <button type="button" data-news-page="-1" aria-label="Previous headlines" class="flex h-11 w-11 items-center justify-center rounded-full border border-border transition-transform duration-150 hover:border-foreground active:scale-90">&larr;</button>
+        <button type="button" data-news-page="1" aria-label="More headlines" class="flex h-11 w-11 items-center justify-center rounded-full border border-border transition-transform duration-150 hover:border-foreground active:scale-90">&rarr;</button>
+      </div>
+    </div>
+  </div>
+
+  <ul data-news-list class="mx-auto mb-20 mt-10 hidden max-w-6xl divide-y divide-border border-y border-border px-6 pb-4"></ul>
+</section>

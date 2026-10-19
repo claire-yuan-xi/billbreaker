@@ -1,0 +1,10 @@
+{# Bills this browser looked up recently. Hidden until there is one. #}
+<section data-recent class="hidden border-b border-border bg-secondary/20">
+  <div class="mx-auto max-w-6xl px-6 py-6">
+    <div class="flex items-center justify-between">
+      <h2 class="text-sm font-semibold text-foreground">Recent</h2>
+      <button type="button" data-recent-clear class="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Clear</button>
+    </div>
+    <div data-recent-list class="mt-4 flex flex-wrap gap-2"></div>
+  </div>
+</section>

@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.DS_Store
+__pycache__/
+*.pyc
+.pytest_cache/
+.ipynb_checkpoints/
+.venv/
+data/
+*.tgz
+ml/bill_breaker_model/
+ml/.work/
+ml/.onnx/
+ml/.onnx_upload/
+ml/.onnx_pc/

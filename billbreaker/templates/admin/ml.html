@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% from "admin/_macros.html" import panel, admin_header %}
+{% block title %}BillBreaker | Model admin{% endblock %}
+{% block description %}How the Bill Breaker model scores, ranks and explains bills.{% endblock %}
+{% block meta %}<meta name="robots" content="noindex,nofollow" />{% endblock %}
+{% block vendor %}{% endblock %}
+{% block body %}
+<main class="min-h-screen bg-background text-foreground">
+  {{ admin_header("Admin · Model") }}
+  <div class="mx-auto max-w-6xl px-6 pb-24">
+    <div class="py-12">
+      <h1 class="font-serif text-5xl font-bold tracking-tight md:text-6xl">How the model explains a bill</h1>
+      <div class="mt-8">{% include "admin/_status.html" %}</div>
+    </div>
+
+    {% call panel("01 · Quality", "Fine-tuning doubled summary overlap") %}{% include "admin/_scorecard.html" %}{% endcall %}
+
+    {% call panel("02 · Samples", "Model output next to the official summary") %}
+    <div class="divide-y divide-border border border-border">
+      {% for s in samples %}
+      <div class="grid gap-4 p-5 md:grid-cols-12">
+        <div class="font-serif text-lg font-semibold md:col-span-3">{{ s.title }}</div>
+        {% for label, text in [("Fine-tuned model", s.tuned), ("Official summary", s.reference)] %}
+        <div class="text-sm leading-relaxed md:col-span-4 md:last:col-span-5">
+          <div class="mb-1 text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{{ label }}</div>
+          {{ text }}
+        </div>
+        {% endfor %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endcall %}
+
+    {% call panel("03 · Reader", "Who it's explaining to") %}
+      {% with profile=example_profile, terms=example_terms %}{% include "admin/_reader_terms.html" %}{% endwith %}
+    {% endcall %}
+    {% call panel("04 · Ranking", "What matters in " ~ example.title) %}
+      {% with rows=example.sections, total=None %}{% include "admin/_section_table.html" %}{% endwith %}
+    {% endcall %}
+    {% call panel("05 · Summary", "General summary") %}
+      <p class="max-w-3xl text-sm leading-relaxed">{{ example.general }}</p>
+    {% endcall %}
+    {% call panel("06 · Personalized + checked", "What the reader would see") %}
+      {% include "admin/_claims.html" %}
+    {% endcall %}
+    {% call panel("07 · Try it", "Run the pipeline on any bill") %}{% include "admin/_playground.html" %}{% endcall %}
+  </div>
+  <script type="application/json" id="example-profile">{{ example_profile_raw | tojson }}</script>
+</main>
+{% endblock %}
+{% block scripts %}
+<script type="module" src="{{ url_for('static', path='js/admin/ml-playground.js') }}"></script>
+{% endblock %}

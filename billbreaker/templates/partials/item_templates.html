@@ -1,0 +1,60 @@
+{# Markup for repeated items; the scripts clone these and fill the data-slot elements. #}
+<template id="tpl-ticker-item">
+  <a data-slot="link" target="_blank" rel="noopener noreferrer" class="flex items-baseline gap-3 px-6 py-2.5 text-xs hover:text-accent">
+    <span data-slot="time" class="text-[10px] uppercase tracking-[0.2em] text-muted-foreground"></span>
+    <span data-slot="title"></span>
+    <span class="text-muted-foreground">&middot;</span>
+  </a>
+</template>
+
+<template id="tpl-news-lead">
+  <li data-news-card class="shrink-0">
+    <a data-slot="link" target="_blank" rel="noopener noreferrer" class="card-glare group flex h-[420px] w-[min(560px,86vw)] flex-col justify-between bg-[#14171f] p-8 text-white transition-[translate] duration-300 hover:-translate-y-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent">
+      <div class="flex items-center justify-between text-[10px] uppercase tracking-[0.3em] text-white/60">
+        <span class="flex items-center gap-2"><span class="h-1.5 w-1.5 animate-pulse rounded-full bg-accent"></span>latest &middot; <span data-slot="topic"></span></span>
+        <span data-slot="time"></span>
+      </div>
+      <h3 data-slot="title" class="font-serif text-3xl font-semibold leading-[1.1] md:text-[2.6rem]"></h3>
+      <span class="flex items-center justify-between border-t border-white/20 pt-4 text-[11px] uppercase tracking-[0.25em]">Read on AP <span aria-hidden="true" class="transition-transform group-hover:translate-x-1">&#8599;</span></span>
+    </a>
+  </li>
+</template>
+
+<template id="tpl-news-card">
+  <li data-news-card class="shrink-0">
+    <a data-slot="link" target="_blank" rel="noopener noreferrer" class="card-glare group flex h-[420px] w-[290px] flex-col justify-between border border-border bg-[#fbf8f0] p-6 transition-[translate,border-color,box-shadow] duration-300 hover:-translate-y-1 hover:border-foreground hover:shadow-[0_24px_40px_-24px_rgba(0,0,0,0.4)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-foreground">
+      <div>
+        <div class="flex items-baseline justify-between">
+          <span data-slot="index" class="font-serif text-5xl leading-none text-foreground/15"></span>
+          <span data-slot="time" class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground"></span>
+        </div>
+        <div data-slot="topic" class="mt-6 text-[10px] uppercase tracking-[0.3em] text-[#a6501a]"></div>
+        <h3 data-slot="title" class="mt-3 line-clamp-6 font-serif text-[1.6rem] font-semibold leading-[1.15]"></h3>
+      </div>
+      <span class="flex items-center justify-between border-t border-border pt-4 text-[10px] uppercase tracking-[0.25em] text-muted-foreground group-hover:text-foreground">Read on AP <span aria-hidden="true" class="transition-transform group-hover:translate-x-1">&#8599;</span></span>
+    </a>
+  </li>
+</template>
+
+<template id="tpl-news-row">
+  <li data-news-card class="group flex flex-col gap-2 py-5 md:flex-row md:items-center md:gap-6">
+    <span data-slot="time" class="w-24 shrink-0 text-[10px] uppercase tracking-[0.25em] text-muted-foreground"></span>
+    <span data-slot="topic" class="w-28 shrink-0 text-[10px] uppercase tracking-[0.25em] text-[#a6501a]"></span>
+    <a data-slot="link" target="_blank" rel="noopener noreferrer" class="flex-1 font-serif text-xl font-semibold leading-snug hover:text-[#a6501a]"><span data-slot="title"></span><span class="sr-only"> (opens AP News in a new tab)</span></a>
+    <span aria-hidden="true" class="hidden text-muted-foreground md:block">&#8599;</span>
+  </li>
+</template>
+
+<template id="tpl-recent">
+  <a data-slot="link" class="group flex items-center gap-3 border border-border bg-background px-3 py-2 text-xs hover:border-foreground">
+    <span data-slot="state" class="text-[10px] uppercase tracking-[0.25em] text-[#a6501a]"></span>
+    <span data-slot="number" class="font-medium"></span>
+    <span data-slot="title" class="max-w-[200px] truncate text-muted-foreground group-hover:text-foreground"></span>
+    <span class="text-[10px] text-muted-foreground">&#8599;</span>
+  </a>
+</template>
+
+{% include "partials/saved_card_template.html" %}
+{% include "partials/notice_template.html" %}
+
+<script type="application/json" id="state-names">{{ STATE_NAMES | tojson }}</script>

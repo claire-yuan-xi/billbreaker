@@ -1,0 +1,16 @@
+{% macro panel(step, title) %}
+<section class="border-t border-border py-10">
+  <div class="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">{{ step }}</div>
+  <h2 class="mt-2 font-serif text-3xl font-bold tracking-tight">{{ title }}</h2>
+  <div class="mt-6">{{ caller() }}</div>
+</section>
+{% endmacro %}
+
+{% macro admin_header(label) %}
+<header class="border-b border-border">
+  <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+    <a href="/" class="flex items-center gap-2 text-sm font-medium tracking-tight"><span class="inline-block h-2 w-2 bg-foreground"></span><span>bill_breaker</span></a>
+    <span class="text-[10px] uppercase tracking-[0.3em] text-muted-foreground">{{ label }}</span>
+  </div>
+</header>
+{% endmacro %}

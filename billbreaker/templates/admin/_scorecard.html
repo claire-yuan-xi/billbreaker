@@ -1,0 +1,35 @@
+{% set metrics = [("rouge1", "ROUGE-1"), ("rouge2", "ROUGE-2"), ("rougeL", "ROUGE-L"), ("rougeLsum", "ROUGE-Lsum")] %}
+{# Validated pair on a light surface: baseline blue, fine-tuned orange. #}
+{% set colors = ["#4f7cc4", "#d9661a"] %}
+<div class="grid gap-10 md:grid-cols-12">
+  <div class="md:col-span-4">
+    <div class="font-serif text-6xl font-bold tracking-tight">+{{ lift }}%</div>
+    <p class="mt-2 text-sm text-muted-foreground">ROUGE-1 over untrained FLAN-T5, on {{ card.evalSet }}.</p>
+    <dl class="mt-6 space-y-3 text-xs">
+      {% for k, v in [("Base model", card.base ~ " (" ~ card.params ~ ")"), ("Trained on", card.trainedOn), ("Personalizer", card.personalizer)] %}
+      <div><dt class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{{ k }}</dt><dd class="mt-1">{{ v }}</dd></div>
+      {% endfor %}
+    </dl>
+  </div>
+  <figure class="md:col-span-8" aria-label="ROUGE scores, untrained versus fine-tuned">
+    <div class="mb-4 flex flex-wrap gap-5 text-xs">
+      {% for r in rouge %}<span class="flex items-center gap-2"><span class="inline-block h-2.5 w-2.5 rounded-sm" style="background: {{ colors[loop.index0] }}"></span>{{ r.name }}</span>{% endfor %}
+    </div>
+    <div class="space-y-5">
+      {% for key, label in metrics %}
+      <div>
+        <div class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{{ label }}</div>
+        <div class="mt-2 space-y-[2px]">
+          {% for r in rouge %}
+          <div class="group flex items-center gap-3" title="{{ r.name }} · {{ label }}: {{ '%.3f' % r[key] }}">
+            <div class="h-4 flex-1"><div class="h-full rounded-r-[4px] transition-opacity group-hover:opacity-80" style="width: {{ r[key] / 0.5 * 100 }}%; background: {{ colors[loop.index0] }}"></div></div>
+            <span class="w-12 text-right text-xs tabular-nums">{{ '%.3f' % r[key] }}</span>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    <figcaption class="mt-4 text-[11px] text-muted-foreground">Word overlap with the official summaries; higher is better. Scale 0 to 0.5.</figcaption>
+  </figure>
+</div>

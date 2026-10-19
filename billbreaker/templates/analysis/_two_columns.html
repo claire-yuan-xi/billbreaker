@@ -1,0 +1,17 @@
+{# Two side-by-side lists. columns: [(label, color, rows, empty_text)]; rows: (heading, sub, large). #}
+<div class="mt-12 grid grid-cols-1 gap-10 md:grid-cols-2">
+  {% for label, color, rows, empty in columns %}
+  <div>
+    <div class="text-sm font-semibold" style="color: {{ color }}">{{ label }}</div>
+    <ul class="mt-4 space-y-5">
+      {% if not rows and empty %}<li class="font-serif text-sm text-[#7a766c]">{{ empty }}</li>{% endif %}
+      {% for heading, sub, big in rows %}
+      <li class="border-t border-[#d6d3ca] pt-3">
+        <div class="font-serif {{ 'text-lg' if big else 'text-base leading-[1.6]' }}">{{ heading }}</div>
+        <div class="mt-1 font-serif {{ 'text-sm leading-relaxed' if big else 'text-xs' }} text-[#5a5650]">{{ sub }}</div>
+      </li>
+      {% endfor %}
+    </ul>
+  </div>
+  {% endfor %}
+</div>

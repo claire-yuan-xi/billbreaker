@@ -1,0 +1,16 @@
+{% if data.citations %}
+<div class="mt-12">
+  <div class="text-sm font-semibold text-[#3a3a3a]">Citations from the bill</div>
+  <ul class="mt-4 space-y-6">
+    {% for c in data.citations %}
+    <li class="border-t border-[#d6d3ca] pt-4">
+      <blockquote class="border-l border-[#9a958a] pl-5 font-serif text-base leading-[1.7] text-[#2a2a2a]">"{{ c.quote }}"</blockquote>
+      <div class="mt-2 flex flex-wrap items-baseline gap-x-3 font-serif text-xs text-[#5a5650]">
+        {% if c.section %}<span>&sect; {{ c.section }}</span>{% endif %}
+        <span>{{ c.why_matters }}</span>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}

@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}BillBreaker | Abuse monitoring{% endblock %}
+{% block description %}Review recent BillBreaker rate-limit events and abuse alerts.{% endblock %}
+{% block meta %}<meta name="robots" content="noindex,nofollow" />{% endblock %}
+{% block vendor %}{% endblock %}
+{% block body %}
+<main data-abuse class="mx-auto max-w-5xl p-6">
+  <h1 class="text-2xl font-semibold">Abuse events</h1>
+  <p class="mt-1 text-sm text-muted-foreground">Recent rate-limit events (near limit, exceeded, store errors). Gated by <code>ABUSE_ADMIN_TOKEN</code>.</p>
+  <form data-abuse-form class="mt-4 flex gap-2">
+    <input type="password" data-abuse-token placeholder="ABUSE_ADMIN_TOKEN" autocomplete="off" class="flex-1 rounded border bg-background px-3 py-1.5 text-sm" />
+    <button type="submit" data-abuse-load disabled class="rounded bg-primary px-4 py-1.5 text-sm font-medium text-primary-foreground disabled:opacity-50">Load</button>
+  </form>
+  <p data-abuse-error class="mt-3 hidden text-sm text-destructive"></p>
+  <div data-abuse-table class="mt-6 hidden overflow-x-auto rounded border">
+    <table class="w-full text-left text-sm">
+      <thead class="bg-muted/40">
+        <tr>
+          <th class="px-3 py-2">Time</th><th class="px-3 py-2">Reason</th><th class="px-3 py-2">Identifier</th>
+          <th class="px-3 py-2">Endpoint</th><th class="px-3 py-2 text-right">Count / Limit</th><th class="px-3 py-2 text-right">Window</th>
+        </tr>
+      </thead>
+      <tbody data-abuse-rows></tbody>
+    </table>
+  </div>
+  <template id="tpl-abuse-row">
+    <tr class="border-t">
+      <td data-slot="ts" class="px-3 py-2 font-mono text-xs"></td>
+      <td class="px-3 py-2"><span data-slot="reason" class="rounded px-2 py-0.5 text-xs font-medium"></span></td>
+      <td data-slot="identifier" class="break-all px-3 py-2 font-mono text-xs"></td>
+      <td data-slot="endpoint" class="px-3 py-2 text-xs"></td>
+      <td data-slot="count" class="px-3 py-2 text-right font-mono text-xs"></td>
+      <td data-slot="window" class="px-3 py-2 text-right font-mono text-xs"></td>
+    </tr>
+  </template>
+</main>
+{% endblock %}
+{% block scripts %}
+<script type="module" src="{{ url_for('static', path='js/admin/abuse.js') }}"></script>
+{% endblock %}

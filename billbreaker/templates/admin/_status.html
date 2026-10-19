@@ -1,0 +1,19 @@
+{# What is live versus still on the notebook, and the next step to change that. #}
+{% set rows = [
+  ("Section ranking", True, "Runs on the server; same rules as the notebook."),
+  ("Claims check", True, "Runs on the server on any explanation."),
+  ("Fine-tuned weights saved", card.weightsSaved, "Set SAVE_TO_DRIVE = True (or push to the Hugging Face Hub) and re-run training."),
+  ("Model", True, "Runs in the browser from clairexi/bill-breaker-t5-onnx; Gemini personalizes its summary."),
+] %}
+<ul class="grid gap-px border border-border bg-border sm:grid-cols-2">
+  {% for label, ok, note in rows %}
+  <li class="bg-background p-4">
+    <div class="flex items-center gap-2 text-sm font-medium">
+      <span aria-hidden="true" class="inline-block h-2 w-2 rounded-full {{ 'bg-[#2f855a]' if ok else 'bg-[#b7791f]' }}"></span>
+      {{ label }}
+      <span class="ml-auto text-[10px] uppercase tracking-[0.25em] text-muted-foreground">{{ "Ready" if ok else "To do" }}</span>
+    </div>
+    <p class="mt-1 break-words text-xs text-muted-foreground">{{ note }}</p>
+  </li>
+  {% endfor %}
+</ul>

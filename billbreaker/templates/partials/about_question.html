@@ -1,0 +1,21 @@
+{% set id = "about-" ~ q.key %}
+<fieldset data-question="{{ q.key }}" class="border-t border-border pt-4">
+  <legend class="sr-only">{{ q.label }}</legend>
+  <label {% if not (q.choices and not q.free) %}for="{{ id }}"{% endif %} class="block text-sm">{{ q.label }}</label>
+  {% if q.key == "state" %}
+  <select id="{{ id }}" data-answer class="mt-2 w-full border border-border bg-background px-3 py-3 text-sm hover:border-foreground focus:border-foreground focus:outline-none">
+    <option value="">Prefer not to say</option>
+    {% for code, name in STATES if code != "US" %}<option value="{{ name }}">{{ name }}</option>{% endfor %}
+  </select>
+  {% endif %}
+  {% if q.choices %}
+  <div class="mt-2 flex flex-wrap gap-2" role="group" aria-label="{{ q.label }}">
+    {% for c in q.choices %}
+    <button type="button" data-choice="{{ c }}" aria-pressed="false" class="border border-border px-3 py-2 text-xs font-medium transition-[color,background-color,transform] duration-150 hover:border-foreground active:scale-90 aria-pressed:border-foreground aria-pressed:bg-foreground aria-pressed:text-background">{{ c }}</button>
+    {% endfor %}
+  </div>
+  {% endif %}
+  {% if q.free %}
+  <input id="{{ id }}" data-free placeholder="{{ q.hint or ('Other' if q.choices else '') }}" class="mt-2 w-full border border-border bg-background px-3 py-3 text-sm outline-none placeholder:text-muted-foreground hover:border-foreground focus:border-foreground" />
+  {% endif %}
+</fieldset>

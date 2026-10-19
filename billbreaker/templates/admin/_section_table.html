@@ -1,0 +1,34 @@
+{# Ranked bill sections with a score bar, as passed to the personalizer. #}
+{% if not rows %}
+<p class="text-sm text-muted-foreground">No section mentions this reader's terms, so the explanation should say the bill does not clearly affect them.</p>
+{% else %}
+{% set max_score = rows | map(attribute="score") | max %}
+<div>
+  <table class="w-full text-left text-sm">
+    <thead class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
+      <tr class="border-b border-border">
+        <th class="py-2 pr-4 font-normal">Sec.</th>
+        <th class="py-2 pr-4 font-normal">Heading</th>
+        <th class="w-40 py-2 pr-4 font-normal">Score</th>
+        <th class="py-2 font-normal">Matched terms</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in rows %}
+      <tr class="border-b border-border align-top">
+        <td class="py-3 pr-4 tabular-nums">{{ r.section }}</td>
+        <td class="py-3 pr-4">{{ r.heading or "(untitled)" }}</td>
+        <td class="py-3 pr-4">
+          <div class="flex items-center gap-2" title="Score {{ r.score }}">
+            <div class="h-2 flex-1"><div class="h-full rounded-r-[4px] bg-[#d9661a]" style="width: {{ (r.score / max_score * 100) | round(1) }}%"></div></div>
+            <span class="w-6 text-right tabular-nums">{{ r.score }}</span>
+          </div>
+        </td>
+        <td class="py-3 text-xs text-muted-foreground">{{ r.matchedTerms | join(", ") }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% if total %}<p class="mt-2 text-[11px] text-muted-foreground">Top {{ rows | length }} of {{ total }} sections.</p>{% endif %}
+</div>
+{% endif %}

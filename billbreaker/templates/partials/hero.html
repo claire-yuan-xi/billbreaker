@@ -1,0 +1,26 @@
+{# The Capitol photo hero. Public-domain photograph; see static/images/CREDITS.md. #}
+<section data-hero data-deep="false" aria-labelledby="hero-title" class="group/hero relative isolate h-[100svh] min-h-[620px] overflow-hidden bg-[#1c2230] text-white [perspective:1200px]">
+  <div data-hero-photo aria-hidden="true" class="absolute -inset-x-8 -bottom-[14%] -top-8 opacity-100 transition-opacity duration-[1600ms] will-change-transform group-data-[deep=true]/hero:opacity-0">
+    <img data-photo data-loaded="false" src="{{ url_for('static', path='images/capitol.jpg') }}" alt="" fetchpriority="high" decoding="async" class="h-full w-full object-cover object-[50%_40%] opacity-0 transition-opacity duration-1000 data-[loaded=true]:opacity-100" />
+    <div class="hero-clouds absolute inset-0 mix-blend-multiply"></div>
+  </div>
+  <canvas data-hero-canvas aria-hidden="true" class="absolute inset-0 h-full w-full opacity-0 transition-opacity duration-[1600ms] ease-out group-data-[deep=true]/hero:opacity-100"></canvas>
+  <div aria-hidden="true" class="absolute inset-0 -z-10 bg-[radial-gradient(120%_80%_at_70%_20%,#f3c99a_0%,#93a9c6_45%,#2b3448_100%)]"></div>
+  <div data-dusk aria-hidden="true" class="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(255,150,70,0.28)_0%,rgba(120,40,60,0.35)_60%,rgba(20,20,40,0.6)_100%)] opacity-0 mix-blend-multiply group-data-[deep=true]/hero:hidden"></div>
+  <div aria-hidden="true" class="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_60%_at_50%_55%,rgba(14,17,24,0)_0%,rgba(14,17,24,0.55)_100%),linear-gradient(0deg,rgba(14,17,24,0.7)_0%,rgba(14,17,24,0)_40%)]"></div>
+
+  <div data-hero-copy class="relative mx-auto flex h-full max-w-6xl flex-col items-center justify-center px-6 pt-24 text-center">
+    <h1 id="hero-title" class="font-serif text-6xl font-bold leading-[1.02] tracking-tight mix-blend-overlay md:text-9xl">
+      {# Room under each line so descenders clear the reveal mask. #}
+      <span class="block overflow-hidden pb-[0.18em]"><span data-hero-line class="block">Legislation</span></span>
+      <span class="block overflow-hidden pb-[0.18em]"><span data-hero-line class="block">in plain English</span></span>
+    </h1>
+    <div data-hero-fade class="mt-10 flex flex-col items-center gap-4 sm:flex-row">
+      <button type="button" data-open-search="number" data-press="magnetic" class="group relative inline-flex items-center justify-between gap-10 overflow-hidden bg-white px-8 py-6 text-[#14171f] shadow-[0_20px_60px_-15px_rgba(0,0,0,0.6)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-accent sm:min-w-[360px]">
+        <span class="font-serif text-3xl font-bold md:text-4xl">Search a bill</span>
+        <span data-press-arrow aria-hidden="true" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-accent text-xl font-bold text-[#14171f]">&rarr;</span>
+      </button>
+      <button type="button" data-open-search="paste" data-press class="relative overflow-hidden border border-white/40 px-5 py-4 text-[11px] font-semibold uppercase tracking-[0.25em] text-white hover:border-white">Paste text</button>
+    </div>
+  </div>
+</section>

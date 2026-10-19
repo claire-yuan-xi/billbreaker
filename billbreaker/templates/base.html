@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}BillBreaker{% endblock %}</title>
+    <meta name="description" content="{% block description %}Plain-English breakdowns of legislation. Free, no sign-in.{% endblock %}" />
+    <meta property="og:title" content="{{ self.title() }}" />
+    <meta property="og:description" content="{{ self.description() }}" />
+    <meta property="og:type" content="{% block og_type %}website{% endblock %}" />
+    <meta name="twitter:card" content="summary" />
+    {% block meta %}{% endblock %}
+    <link rel="icon" href="/favicon.ico" sizes="any" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,500..900&display=swap"
+    />
+    <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}" />
+    {% block vendor %}
+    <script src="{{ url_for('static', path='vendor/gsap.min.js') }}" defer></script>
+    <script src="{{ url_for('static', path='vendor/ScrollTrigger.min.js') }}" defer></script>
+    {% endblock %}
+  </head>
+  <body class="{% block body_class %}{% endblock %}">
+    {% block body %}{% endblock %}
+    {% block scripts %}{% endblock %}
+  </body>
+</html>

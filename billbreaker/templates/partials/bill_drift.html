@@ -1,0 +1,18 @@
+{# A printed bill that drifts down the page as you scroll. Decorative only. #}
+<div data-bill-drift aria-hidden="true" class="pointer-events-none fixed right-[7vw] top-0 z-30 hidden [perspective:900px] motion-reduce:hidden lg:block">
+  <div data-bill-sheet class="bill-paper relative w-[168px] origin-center px-4 pb-6 pt-4 text-[#2b2b2b] shadow-[0_30px_50px_-20px_rgba(0,0,0,0.45),0_2px_6px_rgba(0,0,0,0.12)] [transform-style:preserve-3d]">
+    <div data-bill-sheen class="pointer-events-none absolute inset-0 bg-[linear-gradient(125deg,rgba(255,255,255,0.7)_0%,rgba(255,255,255,0)_45%,rgba(0,0,0,0.08)_100%)] opacity-20"></div>
+    <div class="flex justify-between font-serif text-[7px] uppercase tracking-[0.12em] text-[#555]"><span>119th Congress</span><span>2d Session</span></div>
+    <div class="mt-2 text-center font-serif text-[15px] font-semibold leading-none">H. R. 2026</div>
+    <div class="mt-2 border-t border-[#2b2b2b]/40 pt-1.5 text-center font-serif text-[7px] uppercase tracking-[0.14em]">In the House of Representatives</div>
+    <div class="mt-2 text-center font-serif text-[18px] font-bold tracking-[0.3em]">A BILL</div>
+    <p class="mt-1.5 font-serif text-[8px] leading-[13px] text-[#444]">To make every bill readable by the people it affects, and for other purposes.</p>
+    <p class="mt-2 font-serif text-[7.5px] leading-[14px] text-[#555]"><span class="font-semibold">Be it enacted</span> by the Senate and House of Representatives of the United States of America in Congress assembled,</p>
+    <div class="mt-2 space-y-[9px]">
+      {% for w in [92, 100, 84, 96, 70] %}<div class="h-[2px] bg-[#2b2b2b]/20" style="width: {{ w }}%"></div>{% endfor %}
+    </div>
+    <div class="absolute left-1.5 top-[118px] space-y-[9px] font-serif text-[5px] text-[#999]">
+      {% for n in range(1, 8) %}<div>{{ n }}</div>{% endfor %}
+    </div>
+  </div>
+</div>

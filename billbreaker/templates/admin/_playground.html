@@ -1,0 +1,20 @@
+{# Paste any bill and watch the pipeline rank it for a reader; the model runs in this browser. #}
+<div data-playground class="space-y-8">
+  <div role="tablist" aria-label="Reader" class="inline-flex border border-border">
+    {% for key, label in [("example", "Notebook reader"), ("mine", "My answers (this tab)")] %}
+    <button type="button" role="tab" data-reader="{{ key }}" aria-selected="{{ 'true' if key == 'example' else 'false' }}" class="px-4 py-2 text-[10px] font-semibold uppercase tracking-[0.25em] text-muted-foreground aria-selected:bg-foreground aria-selected:text-background">{{ label }}</button>
+    {% endfor %}
+  </div>
+  <div data-pg-terms>{% with profile=example_profile, terms=example_terms %}{% include "admin/_reader_terms.html" %}{% endwith %}</div>
+  <div>
+    <label for="ml-bill-text" class="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">Bill text</label>
+    <textarea id="ml-bill-text" data-pg-text placeholder="Paste full bill text from Congress.gov (with its SEC. headings)" class="mt-2 h-48 w-full resize-y border border-border bg-background p-4 text-sm outline-none focus:border-foreground"></textarea>
+  </div>
+  <div data-pg-table></div>
+  <div class="flex flex-wrap items-center gap-4">
+    <button type="button" data-pg-generate disabled class="bg-foreground px-6 py-4 text-[11px] font-semibold uppercase tracking-[0.3em] text-background disabled:opacity-35">Generate explanation</button>
+    <span data-pg-progress class="text-xs text-muted-foreground"></span>
+    <span data-pg-error class="text-xs text-destructive"></span>
+  </div>
+  <div data-pg-result></div>
+</div>

@@ -1,0 +1,242 @@
+@import "tailwindcss" source(none);
+@source "../../templates";
+@source "../js";
+@source "../../services/render.py";
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
+  --radius-3xl: calc(var(--radius) + 12px);
+  --radius-4xl: calc(var(--radius) + 16px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ring-offset-background: var(--background);
+}
+
+:root {
+  --radius: 0.125rem;
+  --background: oklch(0.985 0.002 80);
+  --foreground: oklch(0.16 0.005 80);
+  --card: oklch(0.985 0.002 80);
+  --card-foreground: oklch(0.16 0.005 80);
+  --popover: oklch(0.985 0.002 80);
+  --popover-foreground: oklch(0.16 0.005 80);
+  --primary: oklch(0.16 0.005 80);
+  --primary-foreground: oklch(0.985 0.002 80);
+  --secondary: oklch(0.95 0.004 80);
+  --secondary-foreground: oklch(0.16 0.005 80);
+  --muted: oklch(0.95 0.004 80);
+  --muted-foreground: oklch(0.5 0.008 80);
+  --accent: oklch(0.72 0.16 55);
+  --accent-foreground: oklch(0.16 0.005 80);
+  --destructive: oklch(0.55 0.22 27);
+  --destructive-foreground: oklch(0.985 0.002 80);
+  --border: oklch(0.88 0.006 80);
+  --input: oklch(0.88 0.006 80);
+  --ring: oklch(0.16 0.005 80);
+  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+
+@theme inline {
+  --font-mono: var(--font-mono);
+  --font-serif: "Fraunces", Georgia, "Times New Roman", serif;
+}
+
+@layer base {
+  * {
+    border-color: var(--color-border);
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-weight: 700;
+  }
+
+  html,
+  body {
+    background-color: var(--color-background);
+    color: var(--color-foreground);
+    font-family: var(--font-mono);
+    font-weight: 500;
+    font-feature-settings: "ss01", "cv02";
+    -webkit-font-smoothing: antialiased;
+  }
+}
+
+@keyframes marquee {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+.animate-marquee {
+  animation: marquee 240s linear infinite;
+  will-change: transform;
+}
+
+.marquee-pause:hover .animate-marquee {
+  animation-play-state: paused;
+}
+
+.marquee-pause:focus-within .animate-marquee {
+  animation-play-state: paused;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-marquee {
+    animation: none;
+  }
+  .marquee-pause > div > div:last-child {
+    overflow-x: auto;
+  }
+}
+
+/* News rail: scroll-snapping cards, scrollbar kept thin rather than hidden so it stays discoverable. */
+.news-rail {
+  scroll-snap-type: x mandatory;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-foreground) transparent;
+  overscroll-behavior-x: contain;
+  /* Line the first card up with the 72rem page column, but let cards bleed to the edge. */
+  padding-inline: max(1.5rem, calc((100vw - 72rem) / 2 + 1.5rem));
+  scroll-padding-inline: max(1.5rem, calc((100vw - 72rem) / 2 + 1.5rem));
+}
+.news-rail > * {
+  scroll-snap-align: start;
+}
+
+/* The drifting bill paper: ruled lines like a printed bill. */
+.bill-paper {
+  background-color: #fbf8f0;
+  background-image: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 13px,
+    rgba(30, 30, 30, 0.07) 13px,
+    rgba(30, 30, 30, 0.07) 14px
+  );
+}
+
+/* Soft cloud shadows sliding over the hero photo. */
+.hero-clouds {
+  background:
+    radial-gradient(40% 30% at 20% 30%, rgba(40, 50, 70, 0.28), transparent 70%),
+    radial-gradient(35% 25% at 70% 60%, rgba(40, 50, 70, 0.22), transparent 70%),
+    radial-gradient(30% 20% at 45% 15%, rgba(40, 50, 70, 0.2), transparent 70%);
+  background-size: 180% 180%;
+  animation: cloud-drift 60s linear infinite alternate;
+}
+@keyframes cloud-drift {
+  from {
+    background-position: 0% 0%;
+  }
+  to {
+    background-position: 100% 60%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hero-clouds {
+    animation: none;
+  }
+}
+
+/* News cards: a soft glare that follows the pointer (see static/js/news/rail-motion.js). */
+.card-glare {
+  position: relative;
+}
+.card-glare::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(
+    420px circle at var(--gx, 50%) var(--gy, 0%),
+    rgba(255, 255, 255, 0.22),
+    transparent 45%
+  );
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.card-glare:hover::after {
+  opacity: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-glare::after {
+    display: none;
+  }
+}
+
+/* Lenis eased scrolling (static/js/lib/smooth-scroll.js). */
+html.lenis,
+html.lenis body {
+  height: auto;
+}
+.lenis.lenis-smooth {
+  scroll-behavior: auto !important;
+}
+.lenis.lenis-stopped {
+  overflow: clip;
+}
+
+/* Native dialogs: the search modal fades in, the saved sheet slides from the right. */
+dialog::backdrop {
+  background: oklch(0.16 0.005 80 / 0.45);
+  backdrop-filter: blur(2px);
+}
+
+dialog.modal[open] {
+  animation: modal-in 0.22s ease-out;
+}
+
+dialog.sheet[open] {
+  animation: sheet-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+}
+
+@keyframes sheet-in {
+  from {
+    transform: translateX(100%);
+  }
+}
+
+html.modal-open {
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  dialog.modal[open],
+  dialog.sheet[open] {
+    animation: none;
+  }
+}

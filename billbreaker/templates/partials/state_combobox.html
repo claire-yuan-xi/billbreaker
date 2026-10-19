@@ -1,0 +1,23 @@
+{# Searchable jurisdiction picker with keyboard navigation (search/state-combobox.js). #}
+<div data-combobox data-value="US" class="relative">
+  <button type="button" data-combobox-button aria-haspopup="listbox" aria-expanded="false" class="flex w-full items-center justify-between border border-border bg-background px-4 py-4 text-left text-base transition-colors hover:border-foreground focus:border-foreground focus:outline-none">
+    <span data-combobox-label>US Federal</span>
+    <span class="text-accent">&#9662;</span>
+  </button>
+  <div data-combobox-panel class="absolute z-30 mt-2 hidden w-full border border-foreground bg-background shadow-lg">
+    <div class="border-b border-border p-2">
+      <input data-combobox-filter aria-label="Filter states" placeholder="Type to filter (e.g. CA, Texas)" class="w-full bg-transparent px-2 py-2 text-sm outline-none placeholder:text-muted-foreground" />
+    </div>
+    <ul data-combobox-list role="listbox" class="max-h-64 overflow-auto">
+      {% for code, name in STATES %}
+      <li data-code="{{ code }}" data-name="{{ name }}">
+        <button type="button" role="option" class="flex w-full items-center justify-between px-4 py-2 text-left text-sm text-foreground/90 transition-colors hover:bg-secondary data-[active=true]:bg-secondary data-[active=true]:text-foreground">
+          <span class="flex items-center gap-3"><span class="w-8 text-[10px] uppercase tracking-[0.2em] text-accent">{{ code }}</span><span>{{ name }}</span></span>
+          <span data-selected-mark class="hidden text-[10px] uppercase tracking-[0.2em] text-muted-foreground">selected</span>
+        </button>
+      </li>
+      {% endfor %}
+      <li data-combobox-none class="hidden px-4 py-3 text-xs text-muted-foreground">No matches.</li>
+    </ul>
+  </div>
+</div>
