@@ -27,11 +27,15 @@ Send = Callable[[httpx.AsyncClient, str], Awaitable[httpx.Response]]
 
 
 class AIError(Exception):
-    """code is AI_NO_KEY, AI_BAD_KEY, AI_FORBIDDEN, RATE_LIMIT, AI_TIMEOUT or AI_GATEWAY_ERROR."""
+    """code is AI_NO_KEY, AI_BAD_KEY, AI_FORBIDDEN, RATE_LIMIT, AI_TIMEOUT or AI_GATEWAY_ERROR.
 
-    def __init__(self, code: str):
+    detail is Google's own message when there is one, shown only on the status page.
+    """
+
+    def __init__(self, code: str, detail: str = ""):
         super().__init__(code)
         self.code = code
+        self.detail = detail
 
 
 def models() -> list[str]:
@@ -74,14 +78,15 @@ async def _post(client: httpx.AsyncClient, url: str, body: dict, model: str) -> 
 def _check(res: httpx.Response, model: str) -> None:
     if res.status_code == 200:
         return
-    log.error("Gemini %s on %s: %s", res.status_code, model, error_message(res.text))
+    detail = f"{model} {res.status_code}: {error_message(res.text)}"
+    log.error("Gemini %s", detail)
     if res.status_code == 429:
-        raise AIError("RATE_LIMIT")
+        raise AIError("RATE_LIMIT", detail)
     if res.status_code == 403:
-        raise AIError("AI_FORBIDDEN")
+        raise AIError("AI_FORBIDDEN", detail)
     if res.status_code in (400, 401) and "API key" in res.text:
-        raise AIError("AI_BAD_KEY")
-    raise AIError("AI_GATEWAY_ERROR")
+        raise AIError("AI_BAD_KEY", detail)
+    raise AIError("AI_GATEWAY_ERROR", detail)
 
 
 async def _run(send: Send) -> tuple[httpx.Response, str]:

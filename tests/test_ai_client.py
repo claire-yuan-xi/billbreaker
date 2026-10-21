@@ -49,6 +49,7 @@ def test_a_refused_key_is_named(monkeypatch, set_setting):
         asyncio.run(ai_client.call_ai("s", "u", SCHEMA))
     except ai_client.AIError as exc:
         assert exc.code == "AI_FORBIDDEN"
+        assert exc.detail.startswith("main-model 403")
     else:
         raise AssertionError("expected AIError")
 
