@@ -48,6 +48,11 @@ Open `/api/status` to see the deployed commit and which keys are set (never
 the keys themselves). Add `?check=ai` to see what Gemini answers for each
 model, `?check=breakdown` to run a sample breakdown, or
 `?check=research&state=TX&bill=HB 1` to look up a bill on the web.
+`?check=wait&seconds=20` shows whether a request may run that long.
+
+A breakdown can take a minute, so `vercel.json` turns on Fluid compute and
+lets the function run for up to 300 seconds, the free Hobby limit. Without it
+Vercel cut requests off after about 10 seconds and every breakdown failed.
 
 ## Later
 
