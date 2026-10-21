@@ -7,7 +7,7 @@ sleeps, and share links and cached breakdowns are kept.
 ## First deploy
 
 1. Sign in at vercel.com with GitHub and choose the free Hobby plan.
-2. Click Add New, then Project, then import `bill-breaker`. Leave every
+2. Click Add New, then Project, then import `billbreaker`. Leave every
    setting as it is and click Deploy. `pyproject.toml` tells Vercel where the
    app is.
 3. In the project, open Storage, click Create, pick Turso, choose the free
@@ -36,7 +36,24 @@ Do this only once the vercel.app link works.
 
 To go back, delete those two records and re-add the worker's custom domains.
 
+## If the repo is recreated
+
+Vercel loses its link when the GitHub repo is deleted and made again. Open
+Settings, then Git, click Disconnect, then Connect Git Repository and pick
+`billbreaker` again. Settings and environment variables are kept.
+
+## Checking the live site
+
+Open `/api/status` to see the deployed commit and which keys are set (never
+the keys themselves). Add `?check=ai` to see what Gemini answers for each
+model, `?check=breakdown` to run a sample breakdown, or
+`?check=research&state=TX&bill=HB 1` to look up a bill on the web.
+
 ## Later
 
+- State bills: nothing to set. When no official text can be fetched, Gemini
+  looks the bill up with Google Search. `OPENSTATES_API_KEY` (free) is
+  optional and lets the site read the official text when a state publishes it
+  as a web page.
 - Model: nothing to set. /admin/ml runs it in the browser from the Hugging Face repo clairexi/bill-breaker-t5-onnx.
 - Every push to main redeploys.
