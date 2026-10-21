@@ -134,7 +134,7 @@ async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: 
         + quote(jurisdiction, safe="")
         + "&identifier="
         + quote(f"{parsed[0]} {parsed[1]}", safe="")
-        + "&include=versions&per_page=1"
+        + "&include=versions&sort=latest_action_desc&per_page=1"
     )
     headers = {"User-Agent": UA, "X-API-KEY": key, "Accept": "application/json"}
     res = await _get(client, search, timeout, headers)
