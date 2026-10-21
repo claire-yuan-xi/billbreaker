@@ -150,18 +150,18 @@ async def call_with_search(system: str, user: str) -> tuple[str, list[dict]]:
 
 
 async def probe() -> list[dict]:
-    """A tiny request to each model, reporting Google's status and message."""
+    """A tiny request to each model at once, reporting Google's status and message."""
     if not settings.gemini_api_key:
         return [{"model": m, "status": None, "message": "No GEMINI_API_KEY on the server."} for m in models()]
-    out = []
-    async with httpx.AsyncClient(timeout=30, transport=_transport) as client:
-        for model in models():
-            body = {"model": model, "messages": [{"role": "user", "content": "Reply with the word ok."}]}
-            try:
-                res = await _post(client, OPENAI_URL, body, model)
-            except AIError as exc:
-                out.append({"model": model, "status": None, "message": exc.code})
-                continue
-            message = "ok" if res.status_code == 200 else error_message(res.text)
-            out.append({"model": model, "status": res.status_code, "message": message})
-    return out
+
+    async def one(client: httpx.AsyncClient, model: str) -> dict:
+        body = {"model": model, "messages": [{"role": "user", "content": "Reply with the word ok."}]}
+        try:
+            res = await _post(client, OPENAI_URL, body, model)
+        except AIError as exc:
+            return {"model": model, "status": None, "message": exc.code}
+        message = "ok" if res.status_code == 200 else error_message(res.text)
+        return {"model": model, "status": res.status_code, "message": message}
+
+    async with httpx.AsyncClient(timeout=20, transport=_transport) as client:
+        return list(await asyncio.gather(*(one(client, m) for m in models())))
