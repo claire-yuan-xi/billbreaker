@@ -83,7 +83,10 @@ async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
             "identifier": found.get("identifier"),
             "session": found.get("session"),
             "title": (found.get("title") or "")[:120],
-            "versions": len(found.get("versions") or []),
+            "versions": [
+                {"date": v.get("date"), "links": [(l.get("media_type"), l.get("url")) for l in v.get("links") or []][:3]}
+                for v in (found.get("versions") or [])[-2:]
+            ],
             "links": [{"url": d.url, "chars": len(d.text)} for d in docs],
         }
     if kind == "search":
