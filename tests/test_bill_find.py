@@ -55,6 +55,8 @@ def test_reads_bills_from_links():
 def test_a_federal_bill_with_its_chamber_needs_no_lookup():
     found = asyncio.run(resolve("US", "H.R. 1"))
     assert found.best == Match("US", "HR 1")
+    # A state chamber with no state picked is not a Congress bill.
+    assert asyncio.run(resolve("US", "AB 5")).best is None
 
 
 def test_a_federal_number_finds_the_house_bill_first(web):
@@ -113,10 +115,27 @@ def test_a_federal_bill_is_found_by_name(web):
     assert found.best == Match("US", "S 5", "Laken Riley Act")
 
 
+def bill_text(short_title):
+    return httpx.Response(200, html=f"<pre>SECTION 1. SHORT TITLE. This Act may be cited as the ``{short_title}''.</pre>")
+
+
+def test_a_named_bill_must_carry_that_name(web):
+    web["duckduckgo.com"] = ddg(
+        ("https://www.congress.gov/bill/119th-congress/house-bill/191/text/ih/pdf", "PDF Th St Congress Session H. R. 191"),
+        ("https://www.congress.gov/bill/119th-congress/house-bill/300", "H.R.300 - 119th Congress (2025-2026): Inflation Reduction Act Repeal Act"),
+        ("https://www.congress.gov/bill/117th-congress/house-bill/5376", "H.R.5376 - 117th Congress (2021-2022): Inflation Reduction Act of 2022"),
+    )
+    web[govinfo(NOW, "hr", 191)] = printed(NOW, "hr", 191)
+    web[f"BILLS-{NOW}hr191"] = bill_text("Lower Costs Act")
+    found = asyncio.run(resolve("US", "Inflation Reduction Act", use_ai=False))
+    assert found.best == Match("US", "HR 5376 (117th)", "Inflation Reduction Act of 2022")
+    assert found.others == [Match("US", "HR 300", "Inflation Reduction Act Repeal Act")]
+
+
 def test_a_guess_is_kept_only_when_govinfo_has_the_bill(web, monkeypatch):
     web["duckduckgo.com"] = ddg()
     web[govinfo(117, "hr", 5376)] = printed(117, "hr", 5376)
-    web["/content/pkg/"] = httpx.Response(200, text="ok")
+    web["/content/pkg/"] = bill_text("Inflation Reduction Act of 2022")
 
     async def guess(system, user, schema, light=False):
         assert "<search>Inflation Reduction Act</search>" in user
@@ -149,3 +168,17 @@ def test_bill_meta_says_when_nothing_matches(client, monkeypatch):
     monkeypatch.setattr(bills, "resolve", nothing)
     body = client.post("/api/bill-meta", json={"state": "US", "billNo": "MI 1245"}).json()
     assert body["found"] is False and body["jurisdiction"] == "MI" and body["others"] == []
+
+
+@pytest.mark.parametrize(
+    "title, clean",
+    [
+        ("S.5 - 119th Congress (2025-2026): Laken Riley Act | Congress.gov | Library of Congress", "Laken Riley Act"),
+        ("H.R.7511 - Laken Riley Act 118th Congress (2023-2024)", "Laken Riley Act"),
+        ("Congress.gov", ""),
+        ("PDF H. R. 29 - Congress.gov", ""),
+        ("Bill Text: MI SB1245 | 2023-2024 | 102nd Legislature | LegiScan", ""),
+    ],
+)
+def test_search_result_titles_are_cleaned(title, clean):
+    assert bill_find._clean_title(title) == clean

@@ -18,14 +18,18 @@ from ..states import STATE_NAMES
 from ..validation import normalize_bill_no, with_congress
 from .ai_client import call_ai
 from .ai_schemas import BILL_GUESS
-from .bill_query import Query, parse_query
+from .bill_query import FEDERAL, Query, parse_query
 from .bill_sources import CONGRESS_CHAMBERS, GOVINFO_TYPES, UA, congresses, current_congress, find_openstates_bill
 from .bill_sources import openstates_jurisdiction
+from .text import strip_html
 from .web_search import search
 
 log = logging.getLogger(__name__)
 
 MAX_MATCHES = 4
+MAX_CHECKS = 4
+HEAD_BYTES = 60_000
+FITS = 0.6
 # Every chamber prefix states use, for a number typed without one (Open States takes up to 20).
 STATE_PREFIXES = (
     "HB", "SB", "AB", "A", "S", "H", "HF", "SF", "LB", "LD",
@@ -39,6 +43,7 @@ GOVINFO_URL = re.compile(r"BILLS-(\d{2,3})([a-z]+?)(\d+)(?:[a-z]{2,4})\b", re.I)
 LEGISCAN_URL = re.compile(r"legiscan\.com/([A-Z]{2})/(?:bill|text|votes|research)/([A-Z]+)(\d+)/(\d{4})", re.I)
 OPENSTATES_URL = re.compile(r"openstates\.org/([a-z]{2})/bills/[^/]+/([A-Z]+)(\d+)", re.I)
 WORD = re.compile(r"[a-z0-9]+")
+SHORT_TITLE = re.compile(r"may be cited as the\s+[`'\"\u201c\u2018]+\s*([^`'\"\u201d\u2019]{3,200})", re.I)
 COMMON = {"the", "act", "of", "a", "an", "and", "for", "to", "in", "on", "bill", "law", "new", "state"}
 
 SYSTEM = (
@@ -66,12 +71,23 @@ class Found:
 
 
 def _words(text: str) -> set[str]:
-    return set(WORD.findall(text.lower())) - COMMON
+    return {w for w in WORD.findall(text.lower()) if not w.isdigit()} - COMMON
 
 
 def _overlap(query: str, title: str) -> float:
     wanted = _words(query)
     return len(wanted & _words(title)) / len(wanted) if wanted else 0.0
+
+
+def _fits(query: str, title: str) -> bool:
+    """Most of the searched words appear in the title."""
+    return _overlap(query, title) >= FITS
+
+
+def _closeness(query: str, title: str) -> float:
+    """Shared words over all words, so "X Act" beats "X Act Repeal Act" for a search of X Act."""
+    wanted, have = _words(query), _words(title)
+    return len(wanted & have) / len(wanted | have) if wanted | have else 0.0
 
 
 def _unique(matches: list[Match]) -> list[Match]:
@@ -88,17 +104,45 @@ def federal_bill(congress: int, prefix: str, number: str) -> str:
     return with_congress(f"{prefix} {int(number)}", None if congress == current_congress() else congress)
 
 
-async def on_govinfo(client: httpx.AsyncClient, congress: int, prefix: str, number: str, timeout: float) -> bool:
-    """Whether GovInfo has a printed version, read from where its link service redirects."""
+async def govinfo_start(client: httpx.AsyncClient, congress: int, prefix: str, number: str, timeout: float) -> str | None:
+    """The start of the bill's newest printed text on GovInfo, or None when it has none."""
     kind = GOVINFO_TYPES.get(prefix)
     if not kind:
-        return False
+        return None
     url = f"https://www.govinfo.gov/link/bills/{congress}/{kind}/{number}?link-type=html"
     try:
         async with client.stream("GET", url, timeout=timeout, headers={"User-Agent": UA}) as res:
-            return res.status_code == 200 and "BILLS-" in str(res.url)
+            # A missing bill answers 200 on the link page itself, with no package to redirect to.
+            if res.status_code != 200 or "BILLS-" not in str(res.url):
+                return None
+            data = b""
+            async for chunk in res.aiter_bytes():
+                data += chunk
+                if len(data) >= HEAD_BYTES:
+                    break
     except httpx.HTTPError:
-        return False
+        return None
+    return strip_html(data.decode("utf-8", "replace"))
+
+
+async def on_govinfo(client: httpx.AsyncClient, congress: int, prefix: str, number: str, timeout: float) -> bool:
+    return await govinfo_start(client, congress, prefix, number, timeout) is not None
+
+
+def short_titles(text: str) -> list[str]:
+    """What "This Act may be cited as" names, the way a bill states its own name."""
+    return [m.strip() for m in SHORT_TITLE.findall(text)]
+
+
+async def _named(
+    client: httpx.AsyncClient, words: str, congress: int, prefix: str, number: str, title: str, timeout: float
+) -> str | None:
+    """The name that shows this federal bill is the one searched for: its listed title, else its own short title."""
+    if _fits(words, title):
+        return title
+    text = await govinfo_start(client, congress, prefix, number, timeout)
+    fitting = [t for t in short_titles(text or "") if _fits(words, t)]
+    return max(fitting, key=lambda t: _closeness(words, t)) if fitting else None
 
 
 async def _federal_number(client: httpx.AsyncClient, query: Query, timeout: float) -> list[Match]:
@@ -117,7 +161,16 @@ async def _federal_number(client: httpx.AsyncClient, query: Query, timeout: floa
 def _clean_title(title: str) -> str:
     """"S.5 - 119th Congress (2025-2026): Laken Riley Act | Congress.gov" becomes "Laken Riley Act"."""
     title = re.split(r"\s+[|]\s+", html.unescape(title))[0]
-    return title.split(": ", 1)[1].strip() if ": " in title else title.strip()
+    title = re.sub(r"^(?:PDF|Text|All Info|Actions|Summary)\b\s*-?\s*", "", title, flags=re.I)
+    if ": " in title:
+        title = title.split(": ", 1)[1]
+    title = re.sub(r"\s*\d{2,3}(?:st|nd|rd|th) Congress \(\d{4}-\d{4}\)", "", title)
+    title = re.sub(r"^[A-Z][A-Z.\s]{0,10}\d+\s+-\s+", "", title)
+    title = re.sub(r"\s+-\s+(?:Congress\.gov|GovTrack|LegiScan|Open States)\b.*$", "", title, flags=re.I).strip(" -")
+    # A site's name or a bare bill number says nothing the page does not already show.
+    if len(title) < 4 or re.search(r"\.(?:gov|org|com|us)\b", title, re.I) or re.fullmatch(r"[A-Z.\s]+\d+", title):
+        return ""
+    return title
 
 
 def federal_from_url(url: str) -> tuple[int, str, str] | None:
@@ -142,15 +195,22 @@ def state_from_url(url: str, state: str) -> str | None:
 
 
 async def _federal_web(client: httpx.AsyncClient, query: Query, timeout: float) -> list[Match]:
-    found = []
+    """Bills a web search turns up, kept when their title or short title matches the words."""
     for text in (f"{query.words} site:congress.gov", f"{query.words} bill Congress"):
+        seen, candidates = set(), []
         for r in await search(client, text, timeout):
             parsed = federal_from_url(r["url"])
-            if parsed and (not query.congress or parsed[0] == query.congress):
-                found.append(Match("US", federal_bill(*parsed), _clean_title(r["title"])))
-        if found:
-            break
-    return _unique(found)
+            if parsed and parsed not in seen and (not query.congress or parsed[0] == query.congress):
+                seen.add(parsed)
+                candidates.append((*parsed, _clean_title(r["title"])))
+        candidates = candidates[:MAX_CHECKS]
+        names = await asyncio.gather(*(_named(client, query.words, *c, timeout) for c in candidates))
+        kept = [(c, name) for c, name in zip(candidates, names) if name]
+        # The closest name first; search order breaks ties.
+        kept.sort(key=lambda k: -_closeness(query.words, k[1]))
+        if kept:
+            return _unique([Match("US", federal_bill(*c[:3]), c[3] or name) for c, name in kept])
+    return []
 
 
 async def _openstates(client: httpx.AsyncClient, params: list[tuple[str, str]], timeout: float) -> list[dict] | None:
@@ -212,15 +272,23 @@ async def _state_words(client: httpx.AsyncClient, query: Query, timeout: float) 
 
 
 async def _state_web(client: httpx.AsyncClient, query: Query, timeout: float) -> list[Match]:
+    """Bills a web search turns up, checked against Open States when it answers."""
     name = STATE_NAMES.get(query.state, query.state)
     text = f"{name} bill {query.number}" if query.number else f"{name} legislature {query.words} bill"
-    found = []
+    candidates = []
     for r in await search(client, text, timeout):
         bill_no = state_from_url(r["url"], query.state)
-        if not bill_no or (query.number and bill_no.split(" ")[1] != query.number):
-            continue
-        found.append(Match(query.state, bill_no, _clean_title(r["title"])))
-    return _unique(found)
+        if bill_no and (not query.number or bill_no.split(" ")[1] == query.number):
+            candidates.append(Match(query.state, bill_no, _clean_title(r["title"])))
+    found = []
+    for match in _unique(candidates)[:MAX_CHECKS]:
+        bill, why = await find_openstates_bill(client, query.state, match.bill_no, timeout)
+        if not bill and why not in ("no such bill", "bad number"):
+            found.append(match)  # Open States did not answer, so the search result stands.
+        elif bill and (query.number or _fits(query.words, bill.get("title") or "")):
+            # The text lookup reads the newest bill with this number, so its title must fit too.
+            found.append(Match(query.state, match.bill_no, (bill.get("title") or "").strip()))
+    return found
 
 
 async def _typed_state(client: httpx.AsyncClient, query: Query, timeout: float) -> Found:
@@ -254,11 +322,12 @@ async def _guess(client: httpx.AsyncClient, query: Query, timeout: float) -> lis
     if query.state == "US":
         prefix = {"HB": "HR", "SB": "S"}.get(prefix, prefix)
         congress = int(data.get("congress") or 0) or current_congress()
-        if not number.isdigit() or not await on_govinfo(client, congress, prefix, number, timeout):
+        # Gemini's own title is no proof, so the bill's text has to name itself that way.
+        if not number.isdigit() or not await _named(client, query.words, congress, prefix, number, "", timeout):
             return []
         return [Match("US", federal_bill(congress, prefix, number), title)]
     bill, _why = await find_openstates_bill(client, query.state, bill_no, timeout)
-    if not bill or _overlap(f"{query.words} {title}", bill.get("title") or "") == 0:
+    if not bill or not _fits(query.words, bill.get("title") or ""):
         return []
     return [Match(query.state, bill_no, (bill.get("title") or title).strip())]
 
@@ -267,7 +336,9 @@ async def resolve(state: str, raw: str, use_ai: bool = True, timeout: float = 6)
     """The bill a search means, best first, or suggestions when none fits."""
     query = parse_query(state, raw)
     if query.bill_no and query.state == "US":
-        return Found(query, Match("US", query.bill_no))
+        # "AB 5" is no Congress bill; the state it belongs to was not picked.
+        federal = query.bill_no.split(" ")[0] in FEDERAL
+        return Found(query, Match("US", query.bill_no)) if federal else Found(query)
     if not (query.bill_no or query.number or query.words):
         return Found(query)
     async with httpx.AsyncClient(follow_redirects=True) as client:

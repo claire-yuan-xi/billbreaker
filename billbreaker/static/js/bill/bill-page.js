@@ -73,10 +73,13 @@ export function initBillPage(page) {
 
   function showMissing(others) {
     setStatus(null);
-    const place = model.meta?.jurisdiction === "US" ? "Congress" : model.meta?.place || state;
+    const federal = (model.meta?.jurisdiction || state) === "US";
+    const tip = federal
+      ? "Pick the bill's state, or try a number like HR 1245 or the bill's name."
+      : "Try the chamber and number, like HB 1245, or the bill's name.";
     q("[data-missing-text]").textContent = others.length
       ? `No exact match for ${typed}. Did you mean one of these?`
-      : `Nothing matches ${typed} in ${place}. Try the chamber and number, like HB 1245, or the bill's name.`;
+      : `Nothing matches ${typed} in ${federal ? "Congress" : model.meta?.place || state}. ${tip}`;
     billLinks(q("[data-missing-others]"), others);
     ai.classList.add("hidden");
     q("[data-missing]").classList.remove("hidden");
