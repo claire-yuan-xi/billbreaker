@@ -22,6 +22,7 @@ class Document:
     text: str = ""
     html: str = ""
     url: str = ""
+    status: int = 0
 
 
 def pdf_text(data: bytes) -> str:
@@ -41,13 +42,13 @@ async def read_document(client: httpx.AsyncClient, url: str, timeout: float) -> 
         )
     except httpx.HTTPError:
         return Document(url=url)
-    if res.status_code != 200 or len(res.content) > MAX_BYTES:
-        return Document(url=url)
+    final, status = str(res.url), res.status_code
+    if status != 200 or len(res.content) > MAX_BYTES:
+        return Document(url=final, status=status)
     kind = res.headers.get("content-type", "").lower()
-    final = str(res.url)
     if "pdf" in kind or res.content[:5] == b"%PDF-":
         # Parsing is CPU work, so it runs off the event loop.
-        return Document(text=await asyncio.to_thread(pdf_text, res.content), url=final)
+        return Document(text=await asyncio.to_thread(pdf_text, res.content), url=final, status=status)
     if "html" in kind or "text/plain" in kind:
-        return Document(text=strip_html(res.text), html=res.text if "html" in kind else "", url=final)
-    return Document(url=final)
+        return Document(text=strip_html(res.text), html=res.text if "html" in kind else "", url=final, status=status)
+    return Document(url=final, status=status)
