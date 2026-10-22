@@ -3,6 +3,7 @@ What the server is running and whether Gemini answers, so a failure on the live
 site can be read from a browser. Never shows a key, only whether one is set.
 """
 
+import asyncio
 import logging
 import os
 import time
@@ -41,6 +42,7 @@ SAMPLE = (
 )
 TTL = 120
 _cache: dict[str, tuple[float, dict]] = {}
+_running: dict[str, asyncio.Task] = {}
 
 
 CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill")
@@ -145,12 +147,22 @@ async def status(
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < TTL:
         return {**out, check: hit[1], "cached": True}
+    if key in _running:
+        return {**out, check: await asyncio.shield(_running[key]), "cached": True}
     try:
         rl = await bump(f"ip:{client_ip(request)}:status", 20, 600, endpoint="status")
     except Exception as exc:  # noqa: BLE001
         return {**out, "error": f"rate limit store failed: {type(exc).__name__}"}
     if not rl.allowed:
         return JSONResponse({**out, "error": "Too many checks. Try again later."}, status_code=429)
-    result = await _check(check, state, bill, q)
-    _cache[key] = (time.monotonic(), result)
-    return {**out, check: result}
+    # A check keeps running if the browser gives up, so asking again shows its result.
+    task = asyncio.create_task(_check(check, state, bill, q))
+    _running[key] = task
+    task.add_done_callback(lambda t: _finish(key, t))
+    return {**out, check: await asyncio.shield(task)}
+
+
+def _finish(key: str, task: asyncio.Task) -> None:
+    _running.pop(key, None)
+    if not task.cancelled():
+        _cache[key] = (time.monotonic(), task.result())
