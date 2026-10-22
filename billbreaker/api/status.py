@@ -14,7 +14,8 @@ from fastapi.responses import JSONResponse
 from ..config import settings
 from ..services import ai_client
 from ..services.ai_client import AIError
-from ..services.bill_sources import fetch_bill_text
+from ..services.bill_sources import openstates_links, fetch_bill_text, find_openstates_bill
+from ..services.documents import read_document
 from ..services.bill_web import query_for
 from ..services.explain import breakdown
 from ..services.rate_limit import bump, client_ip
@@ -34,7 +35,7 @@ TTL = 120
 _cache: dict[str, tuple[float, dict]] = {}
 
 
-CHECKS = ("ai", "breakdown", "research", "fetch", "search", "bill")
+CHECKS = ("ai", "breakdown", "research", "fetch", "openstates", "search", "bill")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -69,6 +70,21 @@ async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
             "chars": len(text),
             "start": text[:300],
             "tried": fetched.tried,
+        }
+    if kind == "openstates":
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            found, why = await find_openstates_bill(client, state, bill)
+            if not found:
+                return {"ok": False, "error": why}
+            links = openstates_links(found)[:3]
+            docs = [await read_document(client, url, 8) for url in links]
+        return {
+            "ok": True,
+            "identifier": found.get("identifier"),
+            "session": found.get("session"),
+            "title": (found.get("title") or "")[:120],
+            "versions": len(found.get("versions") or []),
+            "links": [{"url": d.url, "chars": len(d.text)} for d in docs],
         }
     if kind == "search":
         text = query or query_for(state, bill)

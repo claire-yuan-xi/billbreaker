@@ -53,7 +53,7 @@ def test_openstates_prefers_the_newest_web_page_then_pdf_then_the_state_page():
         ],
         "sources": [{"url": "https://capitol.texas.gov/History.aspx?Bill=HB1"}, {"url": "http://10.0.0.1/x"}],
     }
-    assert bill_sources._openstates_links(bill) == [
+    assert bill_sources.openstates_links(bill) == [
         "https://capitol.texas.gov/new.htm",
         "https://capitol.texas.gov/old.htm",
         "https://capitol.texas.gov/new.pdf",

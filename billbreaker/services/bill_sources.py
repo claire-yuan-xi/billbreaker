@@ -130,7 +130,7 @@ def _openstates_target_ok(url: str) -> bool:
     return any(host == s.lstrip(".") or host.endswith(s) for s in OPENSTATES_HOSTS)
 
 
-def _openstates_links(bill: dict) -> list[str]:
+def openstates_links(bill: dict) -> list[str]:
     """The newest version's links, web pages before PDFs, then the state's page for the bill."""
     versions = sorted(bill.get("versions") or [], key=lambda v: v.get("date") or "", reverse=True)
     links = [link for v in versions[:2] for link in v.get("links") or [] if link.get("url")]
@@ -150,11 +150,12 @@ def _openstates_summary(bill: dict) -> str:
     return "\n\n".join(p for p in parts if p.strip())
 
 
-async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
+async def find_openstates_bill(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
+    """The bill's Open States record, newest session first, and why there is none."""
     key = settings.openstates_api_key
     parsed = parse_bill_no(bill_no)
     if not key or not parsed:
-        return None
+        return None, "no key" if not key else "bad number"
     jurisdiction = f"ocd-jurisdiction/country:us/state:{state.lower()}/government"
     search = (
         "https://v3.openstates.org/bills?jurisdiction="
@@ -165,15 +166,22 @@ async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: 
     )
     headers = {"User-Agent": UA, "X-API-KEY": key, "Accept": "application/json"}
     res = await _get(client, search, timeout, headers)
-    if not res or res.status_code != 200:
-        return None
+    if not res:
+        return None, "no answer"
+    if res.status_code != 200:
+        return None, f"{res.status_code}: {res.text[:200]}"
     try:
         bill = (res.json().get("results") or [None])[0]
     except ValueError:
-        return None
+        return None, "not JSON"
+    return bill, "" if bill else "no such bill"
+
+
+async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
+    bill, _why = await find_openstates_bill(client, state, bill_no, timeout)
     if not bill:
         return None
-    for url in _openstates_links(bill)[:3]:
+    for url in openstates_links(bill)[:3]:
         doc = await read_document(client, url, timeout)
         if len(doc.text) >= MIN_CHARS:
             return doc.text, url
