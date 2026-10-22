@@ -13,7 +13,8 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from ..config import settings
-from .bill_web import fetch_web_text
+from .bill_web import OFFICIAL_WORDS, fetch_web_text
+from .documents import read_document
 from .text import strip_html
 
 UA = "Mozilla/5.0 (compatible; BillBreaker/1.0)"
@@ -122,7 +123,29 @@ def _openstates_target_ok(url: str) -> bool:
     host = (u.hostname or "").lower()
     if u.scheme != "https" or not host or PRIVATE_HOST.match(host):
         return False
+    if OFFICIAL_WORDS.search(host):
+        return True
     return any(host == s.lstrip(".") or host.endswith(s) for s in OPENSTATES_HOSTS)
+
+
+def _openstates_links(bill: dict) -> list[str]:
+    """The newest version's links, web pages before PDFs, then the state's page for the bill."""
+    versions = sorted(bill.get("versions") or [], key=lambda v: v.get("date") or "", reverse=True)
+    links = [link for v in versions[:2] for link in v.get("links") or [] if link.get("url")]
+    pages = [l["url"] for l in links if "pdf" not in (l.get("media_type") or "").lower()]
+    pdfs = [l["url"] for l in links if "pdf" in (l.get("media_type") or "").lower()]
+    sources = [s["url"] for s in bill.get("sources") or [] if s.get("url")]
+    return [u for u in dict.fromkeys(pages + pdfs + sources) if _openstates_target_ok(u)]
+
+
+def _openstates_summary(bill: dict) -> str:
+    """What Open States itself knows, used when the state's text cannot be read."""
+    parts = [f"{bill.get('identifier', '')}: {bill.get('title', '')}"]
+    parts += [a.get("abstract", "") for a in bill.get("abstracts") or []]
+    action = bill.get("latest_action_description")
+    if action:
+        parts.append(f"Latest action ({bill.get('latest_action_date', '')}): {action}")
+    return "\n\n".join(p for p in parts if p.strip())
 
 
 async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
@@ -136,31 +159,26 @@ async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: 
         + quote(jurisdiction, safe="")
         + "&identifier="
         + quote(f"{parsed[0]} {parsed[1]}", safe="")
-        + "&include=versions&sort=latest_action_desc&per_page=1"
+        + "&include=versions&include=sources&include=abstracts&sort=latest_action_desc&per_page=1"
     )
     headers = {"User-Agent": UA, "X-API-KEY": key, "Accept": "application/json"}
     res = await _get(client, search, timeout, headers)
     if not res or res.status_code != 200:
         return None
     try:
-        result = (res.json().get("results") or [None])[0]
+        bill = (res.json().get("results") or [None])[0]
     except ValueError:
         return None
-    if not result:
+    if not bill:
         return None
-    links = [link for v in result.get("versions") or [] for link in v.get("links") or []]
-    link = next(
-        (l for l in links if l.get("url") and re.search(r"text|html|plain", l.get("media_type") or "text/html", re.I)),
-        None,
-    )
-    source_url = (link or {}).get("url") or ((result.get("sources") or [{}])[0].get("url") or "")
-    if not source_url or not _openstates_target_ok(source_url):
-        return None
-    page = await _get(client, source_url, timeout, {"User-Agent": UA, "Accept": "text/html,text/plain"})
-    if not page or page.status_code != 200:
-        return None
-    text = strip_html(page.text, keep_breaks=False)
-    return (text, source_url) if len(text) >= MIN_CHARS else None
+    for url in _openstates_links(bill)[:3]:
+        doc = await read_document(client, url, timeout)
+        if len(doc.text) >= MIN_CHARS:
+            return doc.text, url
+    summary = _openstates_summary(bill)
+    if bill.get("abstracts") and len(summary) >= 200:
+        return summary, bill.get("openstates_url") or ""
+    return None
 
 
 async def fetch_bill_text(state: str, bill_no: str, budget: float = 25, tier_timeout: float = 6) -> FetchResult:

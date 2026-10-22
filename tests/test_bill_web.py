@@ -44,29 +44,22 @@ def test_search_results_are_unwrapped():
     assert web_search.parse_ddg(ddg) == [{"url": "https://legiscan.com/TX/bill/HB1", "title": "TX HB1"}]
 
 
-def test_legiscan_slugs():
-    assert bill_web.legiscan_slug("TX", "HB 1") == "HB1"
-    assert bill_web.legiscan_slug("NY", "S 1") == "S00001"
-    assert bill_web.legiscan_slug("CA", "AB 1234A") == "AB1234A"
-
-
-def test_legiscan_leads_to_the_state_text():
-    page = BILL_PAGE.replace(
-        "</body>", '<a href="https://capitol.texas.gov/tlodocs/89R/billtext/html/HB00001I.htm">State</a></body>'
-    )
-    text_page = "<pre>" + "H.B. No. 1 AN ACT relating to the budget. " * 20 + "</pre>"
+def test_a_legislature_page_is_followed_to_the_bill_text():
+    page = BILL_PAGE.replace("</body>", '<a href="/tlodocs/89R/billtext/html/HB00001I.htm">Text</a></body>')
+    text_page = "<pre>" + "H.B. No. 1 AN ACT relating to the budget. " * 30 + "</pre>"
 
     def handler(request):
-        if request.url.host == "legiscan.com":
-            return httpx.Response(200, text=page, headers={"content-type": "text/html"})
+        if request.url.host == "html.duckduckgo.com":
+            return httpx.Response(200, text=SEARCH)
         if request.url.path.endswith("HB00001I.htm"):
             return httpx.Response(200, text=text_page, headers={"content-type": "text/html"})
+        if request.url.host == "capitol.texas.gov":
+            return httpx.Response(200, text=page, headers={"content-type": "text/html"})
         return httpx.Response(404)
 
     text, url = run_fetch(handler)
-    assert url.endswith("HB00001I.htm")
+    assert url == "https://capitol.texas.gov/tlodocs/89R/billtext/html/HB00001I.htm"
     assert "AN ACT relating to the budget" in text
-    assert "Relating to school finance" in text
 
 
 def test_a_state_bill_is_read_from_the_pages_that_name_it():
@@ -74,8 +67,6 @@ def test_a_state_bill_is_read_from_the_pages_that_name_it():
 
     def handler(request):
         seen.append(request.url.host)
-        if request.url.host == "legiscan.com" and "/bill/" in request.url.path:
-            return httpx.Response(404)
         if request.url.host == "html.duckduckgo.com":
             return httpx.Response(200, text=SEARCH)
         if request.url.host == "news.example.com":
@@ -86,6 +77,7 @@ def test_a_state_bill_is_read_from_the_pages_that_name_it():
     assert url.startswith("https://capitol.texas.gov")
     assert "Relating to school finance" in text
     assert "www.youtube.com" not in seen
+    assert "legiscan.com" not in seen
 
 
 def test_private_addresses_are_never_fetched():

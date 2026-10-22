@@ -37,3 +37,31 @@ def test_congress_text_is_fetched_and_stripped():
 def test_openstates_targets_are_guarded():
     assert not bill_sources._openstates_target_ok("http://169.254.169.254/latest")
     assert not bill_sources._openstates_target_ok("file:///etc/passwd")
+
+
+def test_openstates_prefers_the_newest_web_page_then_pdf_then_the_state_page():
+    bill = {
+        "versions": [
+            {"date": "2025-01-10", "links": [{"url": "https://capitol.texas.gov/old.htm", "media_type": "text/html"}]},
+            {
+                "date": "2025-03-01",
+                "links": [
+                    {"url": "https://capitol.texas.gov/new.pdf", "media_type": "application/pdf"},
+                    {"url": "https://capitol.texas.gov/new.htm", "media_type": "text/html"},
+                ],
+            },
+        ],
+        "sources": [{"url": "https://capitol.texas.gov/History.aspx?Bill=HB1"}, {"url": "http://10.0.0.1/x"}],
+    }
+    assert bill_sources._openstates_links(bill) == [
+        "https://capitol.texas.gov/new.htm",
+        "https://capitol.texas.gov/old.htm",
+        "https://capitol.texas.gov/new.pdf",
+        "https://capitol.texas.gov/History.aspx?Bill=HB1",
+    ]
+
+
+def test_openstates_hosts_include_legislature_sites_off_gov():
+    assert bill_sources._openstates_target_ok("https://legislature.maine.gov/x")
+    assert bill_sources._openstates_target_ok("https://www.kslegislature.org/li/b2025_26/measures/hb2001/")
+    assert not bill_sources._openstates_target_ok("https://example.com/x")

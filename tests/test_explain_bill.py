@@ -135,3 +135,18 @@ def test_a_bill_the_web_cannot_find_says_so(client, monkeypatch):
     monkeypatch.setattr(explain_api, "research_breakdown", missing)
     body = client.post("/api/explain-bill", json={"state": "OH", "billNo": "HB 99999", "mode": "json"}).json()
     assert "Could not find this bill" in body["error"]
+
+
+def test_a_search_gemini_refuses_reads_as_not_found(client, monkeypatch):
+    from billbreaker.services.ai_client import AIError
+
+    async def no_text(state, bill_no):
+        return FetchResult(None, None, None, ["openstates", "web"])
+
+    async def refused(jurisdiction, bill_no, fallback):
+        raise AIError("RATE_LIMIT", "no free Google Search")
+
+    monkeypatch.setattr(explain_api, "fetch_bill_text", no_text)
+    monkeypatch.setattr(explain_api, "research_breakdown", refused)
+    body = client.post("/api/explain-bill", json={"state": "OH", "billNo": "HB 98", "mode": "json"}).json()
+    assert "Could not find this bill" in body["error"]

@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..services import analysis_cache
+from ..services.ai_client import AIError
 from ..services.bill_sources import fetch_bill_text
 from ..services.explain import breakdown
 from ..services.rate_limit import bump, client_ip
@@ -163,7 +164,13 @@ async def explain_bill(request: Request):
     async def analyze() -> tuple[str, list[dict]]:
         if not research:
             return await breakdown(bill, identifier)
-        found = await research_breakdown(jurisdiction, bill_no, identifier)
+        try:
+            found = await research_breakdown(jurisdiction, bill_no, identifier)
+        except AIError as exc:
+            # Gemini's free tier has no Google Search, so a refusal here means nothing was found.
+            if exc.code in ("RATE_LIMIT", "AI_FORBIDDEN"):
+                raise NotFound() from exc
+            raise
         if not found:
             raise NotFound()
         title, sections, _pages = found
