@@ -130,14 +130,23 @@ def _openstates_target_ok(url: str) -> bool:
     return any(host == s.lstrip(".") or host.endswith(s) for s in OPENSTATES_HOSTS)
 
 
+def _https(url: str) -> str:
+    """Open States often lists plain http links; every legislature site serves https."""
+    return "https://" + url[len("http://"):] if url.startswith("http://") else url
+
+
 def openstates_links(bill: dict) -> list[str]:
-    """The newest version's links, web pages before PDFs, then the state's page for the bill."""
+    """Web pages of the bill's text, newest version first, then PDFs, then the state's page.
+
+    Versions without a date keep Open States' order, which lists the newest first.
+    """
     versions = sorted(bill.get("versions") or [], key=lambda v: v.get("date") or "", reverse=True)
-    links = [link for v in versions[:2] for link in v.get("links") or [] if link.get("url")]
+    links = [link for v in versions for link in v.get("links") or [] if link.get("url")]
     pages = [l["url"] for l in links if "pdf" not in (l.get("media_type") or "").lower()]
-    pdfs = [l["url"] for l in links if "pdf" in (l.get("media_type") or "").lower()]
+    pdfs = [l["url"] for l in links if "pdf" in (l.get("media_type") or "").lower()][:2]
     sources = [s["url"] for s in bill.get("sources") or [] if s.get("url")]
-    return [u for u in dict.fromkeys(pages + pdfs + sources) if _openstates_target_ok(u)]
+    urls = [_https(u) for u in pages + pdfs + sources]
+    return [u for u in dict.fromkeys(urls) if _openstates_target_ok(u)]
 
 
 def _openstates_summary(bill: dict) -> str:
@@ -181,7 +190,7 @@ async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: 
     bill, _why = await find_openstates_bill(client, state, bill_no, timeout)
     if not bill:
         return None
-    for url in openstates_links(bill)[:3]:
+    for url in openstates_links(bill)[:4]:
         doc = await read_document(client, url, timeout)
         if len(doc.text) >= MIN_CHARS:
             return doc.text, url

@@ -39,7 +39,7 @@ def test_openstates_targets_are_guarded():
     assert not bill_sources._openstates_target_ok("file:///etc/passwd")
 
 
-def test_openstates_prefers_the_newest_web_page_then_pdf_then_the_state_page():
+def test_openstates_prefers_web_pages_newest_first_then_pdfs_then_the_state_page():
     bill = {
         "versions": [
             {"date": "2025-01-10", "links": [{"url": "https://capitol.texas.gov/old.htm", "media_type": "text/html"}]},
@@ -47,7 +47,7 @@ def test_openstates_prefers_the_newest_web_page_then_pdf_then_the_state_page():
                 "date": "2025-03-01",
                 "links": [
                     {"url": "https://capitol.texas.gov/new.pdf", "media_type": "application/pdf"},
-                    {"url": "https://capitol.texas.gov/new.htm", "media_type": "text/html"},
+                    {"url": "http://capitol.texas.gov/new.htm", "media_type": "text/html"},
                 ],
             },
         ],
@@ -59,6 +59,16 @@ def test_openstates_prefers_the_newest_web_page_then_pdf_then_the_state_page():
         "https://capitol.texas.gov/new.pdf",
         "https://capitol.texas.gov/History.aspx?Bill=HB1",
     ]
+
+
+def test_undated_versions_keep_open_states_order():
+    bill = {
+        "versions": [
+            {"date": "", "links": [{"url": "http://capitol.texas.gov/HB00001F.HTM", "media_type": "text/html"}]},
+            {"date": "", "links": [{"url": "http://capitol.texas.gov/HB00001I.HTM", "media_type": "text/html"}]},
+        ]
+    }
+    assert bill_sources.openstates_links(bill)[0] == "https://capitol.texas.gov/HB00001F.HTM"
 
 
 def test_openstates_hosts_include_legislature_sites_off_gov():
