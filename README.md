@@ -18,7 +18,7 @@ fine-tuned model.
 ```sh
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements-dev.txt
-cp .env.example .env        # add GEMINI_API_KEY for the AI breakdown
+cp .env.example .env        # add GEMINI_API_KEY, and OPENSTATES_API_KEY for state bills
 uvicorn billbreaker.main:app --reload --port 3000
 ```
 
@@ -49,7 +49,7 @@ billbreaker/
   static/           CSS, JS modules, images, vendored GSAP and Lenis
 notebooks/          model training and the site pipeline
 tests/              pytest suite
-docs/               abuse monitoring
+docs/               deploying to Vercel, abuse monitoring
 ```
 
 ## Pages
