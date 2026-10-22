@@ -47,7 +47,8 @@ WIKI = "https://en.wikipedia.org/w/api.php"
 WIKI_UA = "BillBreaker/1.0 (https://billbreaker.org)"
 # The bill an act's Wikipedia infobox names: {{USBill|117|H.R.|5376}}.
 USBILL = re.compile(r"\{\{\s*USBill\s*\|\s*(\d{1,3})\s*\|\s*([A-Za-z.\s]+?)\s*\|\s*(\d+)", re.I)
-INTRODUCED = re.compile(r"introducedbill\s*=\s*\[*\s*((?:H\.?\s?J\.?\s?Res|H\.?\s?R|S\.?\s?J\.?\s?Res|S)\.?)\s*(\d+)", re.I)
+INTRODUCED = re.compile(r"introducedbill\s*=([^\n]*)", re.I)
+BILL_IN_TEXT = re.compile(r"\b(H\.?\s?J\.?\s?Res|H\.?\s?R|S\.?\s?J\.?\s?Res|S)\.?\s?(\d{1,5})\b", re.I)
 CONGRESS_LINK = re.compile(r"(\d{2,3})(?:st|nd|rd|th) United States Congress")
 SHORT_TITLE = re.compile(r"may be cited as the\s+[`'\"\u201c\u2018]+\s*([^`'\"\u201d\u2019]{3,200})", re.I)
 COMMON = {"the", "act", "of", "a", "an", "and", "for", "to", "in", "on", "bill", "law", "new", "state"}
@@ -231,9 +232,10 @@ async def _wiki(client: httpx.AsyncClient, params: dict, timeout: float) -> dict
 def wiki_bill(wikitext: str) -> tuple[int, str, str] | None:
     """(congress, prefix, number) from an act's infobox: {{USBill|117|H.R.|5376}}, or the
     introduced bill written out with the Congress named elsewhere in the box."""
-    if m := USBILL.search(wikitext):
+    line = INTRODUCED.search(wikitext)
+    if m := USBILL.search(line.group(1) if line else wikitext):
         congress, prefix, number = int(m.group(1)), m.group(2), m.group(3)
-    elif (m := INTRODUCED.search(wikitext)) and (c := CONGRESS_LINK.search(wikitext)):
+    elif line and (m := BILL_IN_TEXT.search(line.group(1))) and (c := CONGRESS_LINK.search(wikitext)):
         congress, prefix, number = int(c.group(1)), m.group(1), m.group(2)
     else:
         return None

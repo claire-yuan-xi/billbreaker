@@ -89,7 +89,10 @@ async def _wiki(words: str) -> dict:
         titles = [r["title"] for r in (data.get("query") or {}).get("search") or []]
         bills = [await bill_find._wiki_bill(client, t, 8) for t in titles[:2]]
         have = [b and await bill_find.on_govinfo(client, *b, 8) for b in bills]
-    return {"ok": any(have), "titles": titles, "bills": bills, "on_govinfo": have}
+        first = await bill_find._wiki(client, {"action": "parse", "page": titles[0], "prop": "wikitext", "section": "0"}, 8) if titles else {}
+    text = (first.get("parse") or {}).get("wikitext") or ""
+    lines = [l[:160] for l in text.splitlines() if re.search(r"introduced|enacted|USBill", l, re.I)][:6]
+    return {"ok": any(have), "titles": titles, "bills": bills, "on_govinfo": have, "first_box": lines}
 
 
 async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
