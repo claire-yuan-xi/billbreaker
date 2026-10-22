@@ -6,6 +6,7 @@ site can be read from a browser. Never shows a key, only whether one is set.
 import asyncio
 import logging
 import os
+import re
 import time
 
 import httpx
@@ -15,6 +16,7 @@ from fastapi.responses import JSONResponse
 from ..config import settings
 from ..services import ai_client
 from ..services.ai_client import AIError
+from ..services.bill_find import describe, resolve
 from ..services.bill_sources import openstates_links, fetch_bill_text, find_openstates_bill
 from ..services.documents import read_document
 from ..services.bill_web import query_for
@@ -45,7 +47,7 @@ _cache: dict[str, tuple[float, dict]] = {}
 _running: dict[str, asyncio.Task] = {}
 
 
-CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill")
+CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -65,7 +67,23 @@ async def _bill(state: str, bill: str) -> dict:
     return {**_summary(*found[:2]), "source": "web", "tried": fetched.tried}
 
 
+async def _resolve(state: str, queries: str) -> dict:
+    """Which bill each search lands on. Searches are split by |, each "MI:1245" or just "1245"."""
+
+    async def one(item: str) -> dict:
+        where, _, typed = item.partition(":") if re.match(r"^[A-Z]{2}:", item) else ("", "", item)
+        found = await resolve(where or state, typed)
+        best = found.best
+        return {"search": item, "bill": f"{best.state} {best.bill_no}" if best else None, **describe(found)}
+
+    items = [i.strip() for i in queries.split("|") if i.strip()][:8]
+    results = await asyncio.gather(*(one(i) for i in items))
+    return {"ok": all(r["found"] for r in results), "results": list(results)}
+
+
 async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
+    if kind == "resolve":
+        return await _resolve(state, query or bill)
     if kind == "ai":
         return {"models": await ai_client.probe()}
     if kind == "foryou":
@@ -142,7 +160,7 @@ async def status(
         return out
     bill = normalize_bill_no(bill) or "AB 5"
     state = state.upper() if state.upper() in STATE_NAMES else "CA"
-    q = q.strip()[:100]
+    q = q.strip()[:400]
     key = f"{check}:{state}:{bill}:{q}"
     hit = _cache.get(key)
     if hit and time.monotonic() - hit[0] < TTL:

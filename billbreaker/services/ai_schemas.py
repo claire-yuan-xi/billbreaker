@@ -86,3 +86,16 @@ FOR_YOU = {
         }
     ),
 }
+
+BILL_GUESS = {
+    "name": "bill_guess",
+    "description": "The bill a reader is searching for by name, when you know it.",
+    "parameters": _obj(
+        {
+            "known": {"type": "boolean"},
+            "bill_no": STRING,
+            "congress": {"type": "integer"},
+            "title": STRING,
+        }
+    ),
+}

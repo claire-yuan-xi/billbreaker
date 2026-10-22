@@ -1,4 +1,5 @@
 import { postJSON } from "../lib/api.js";
+import { billHref } from "../lib/format.js";
 import { saveRecent } from "../lib/recent.js";
 import { wirePress } from "../lib/press.js";
 import { readProfile } from "../lib/reader-profile.js";
@@ -19,12 +20,27 @@ const SHARE_KEYS = {
 };
 const MIN_TEXT = 200;
 
-/** The bill page: header from /api/bill-meta, then the streamed AI breakdown. */
+/** Links to other bills a search could mean, built as text so titles stay plain. */
+function billLinks(box, bills) {
+  box.replaceChildren(
+    ...bills.map((b) => {
+      const a = document.createElement("a");
+      a.href = billHref(b.state, b.billNo);
+      a.className = "border border-[#bdb8ab] px-3 py-1.5 text-sm font-semibold text-[#1a1a1a] hover:border-[#1a1a1a]";
+      a.textContent = b.title ? `${b.billNo} · ${b.title.slice(0, 70)}` : `${b.state === "US" ? "" : `${b.state} `}${b.billNo}`;
+      return a;
+    }),
+  );
+}
+
+/** The bill page: /api/bill-meta settles which bill the search means, then the streamed AI breakdown. */
 export function initBillPage(page) {
   const params = new URLSearchParams(window.location.search);
-  const state = params.get("state") || "US";
-  const number = params.get("number") || "";
+  let state = params.get("state") || "US";
+  let number = params.get("number") || "";
+  const typed = number;
   const text = params.get("text") || "";
+  const pasted = text.trim().length >= MIN_TEXT;
   const q = (sel) => page.querySelector(sel);
   const header = q("[data-bill-header]");
   const ai = q("[data-ai]");
@@ -33,13 +49,12 @@ export function initBillPage(page) {
   const title = () => model.title || model.meta?.id || `${state} ${number}`.trim() || "Bill";
 
   initReaderStrip(q("[data-reader-strip]"));
-  const save = number ? initSaveToggle(q("[data-save-wrap]"), state, number, title) : null;
-  if (number) initShareLink(q("[data-share-link]"));
+  let save = null;
 
   function renderHeader() {
     if (!model.meta && !model.title) return;
     header.classList.remove("hidden");
-    q("[data-jurisdiction]").textContent = state === "US" ? "United States Federal" : state;
+    q("[data-jurisdiction]").textContent = model.meta?.place || (state === "US" ? "United States Federal" : state);
     q("[data-bill-id]").textContent = model.meta?.id || `${state} ${number}`.trim() || "pasted bill";
     q("[data-bill-title]").textContent = title();
     document.title = `BillBreaker | ${title()}`;
@@ -48,21 +63,39 @@ export function initBillPage(page) {
   }
 
   async function loadMeta() {
-    q("[data-meta-error]").classList.add("hidden");
     try {
-      model.meta = await postJSON("/api/bill-meta", { state, billNo: number, hasText: text.trim().length >= MIN_TEXT });
-      const notice = q("[data-meta-notice]");
-      if (model.meta.notice && !model.sections.quick_take) {
-        notice.textContent = model.meta.notice;
-        notice.classList.remove("hidden");
-      }
-      renderHeader();
+      model.meta = await postJSON("/api/bill-meta", { state, billNo: number, hasText: pasted });
     } catch {
-      q("[data-meta-error]").classList.remove("hidden");
+      // The breakdown looks a loose search up on its own, so the page carries on.
+      model.meta = null;
     }
   }
-  q("[data-meta-retry]").addEventListener("click", loadMeta);
-  q("[data-reload]").addEventListener("click", () => window.location.reload());
+
+  function showMissing(others) {
+    setStatus(null);
+    const place = model.meta?.jurisdiction === "US" ? "Congress" : model.meta?.place || state;
+    q("[data-missing-text]").textContent = others.length
+      ? `No exact match for ${typed}. Did you mean one of these?`
+      : `Nothing matches ${typed} in ${place}. Try the chamber and number, like HB 1245, or the bill's name.`;
+    billLinks(q("[data-missing-others]"), others);
+    ai.classList.add("hidden");
+    q("[data-missing]").classList.remove("hidden");
+  }
+
+  /** Swaps a loose search for the bill it found, so links and saves use the real number. */
+  function settle(best, others) {
+    state = best.state;
+    number = best.billNo;
+    if (best.title) model.title = best.title;
+    const url = new URL(window.location.href);
+    url.searchParams.set("state", state);
+    url.searchParams.set("number", number);
+    history.replaceState(null, "", url);
+    if (others.length) {
+      billLinks(q("[data-others-links]"), others);
+      q("[data-others]").classList.replace("hidden", "flex");
+    }
+  }
 
   let started = 0;
   let ticker = 0;
@@ -139,7 +172,6 @@ export function initBillPage(page) {
       const { html, ...data } = payload;
       model.sections[event] = data;
       q(`[data-block="${event}"]`).innerHTML = html;
-      q("[data-meta-notice]").classList.add("hidden");
       ai.classList.remove("hidden");
     }
   }
@@ -156,10 +188,23 @@ export function initBillPage(page) {
     };
   }
 
-  wirePress(page);
-  loadMeta();
-  if (number || text.trim().length >= MIN_TEXT) {
-    setStatus(number && text.trim().length < MIN_TEXT ? "Fetching the bill" : "Reading the bill");
-    runExplain({ state, billNo: number, text, profile: readProfile() }, onEvent);
+  async function start() {
+    if (number && !pasted) setStatus("Finding the bill");
+    await loadMeta();
+    const meta = model.meta;
+    if (number && meta?.found) settle(meta.best, meta.others || []);
+    else if (number && meta && !pasted) return showMissing(meta.others || []);
+    renderHeader();
+    if (number) {
+      save = initSaveToggle(q("[data-save-wrap]"), state, number, title);
+      initShareLink(q("[data-share-link]"));
+    }
+    if (number || pasted) {
+      setStatus(number && !pasted ? "Fetching the bill" : "Reading the bill");
+      runExplain({ state, billNo: number, text, profile: readProfile() }, onEvent);
+    }
   }
+
+  wirePress(page);
+  start();
 }

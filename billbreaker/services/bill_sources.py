@@ -13,6 +13,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from ..config import settings
+from ..validation import ordinal, split_congress
 from .bill_web import OFFICIAL_WORDS, bill_pattern, fetch_web_text
 from .documents import read_document
 from .text import strip_html
@@ -63,12 +64,6 @@ def current_congress(today: date | None = None) -> int:
     return ((today or date.today()).year - 1789) // 2 + 1
 
 
-def ordinal(n: int) -> str:
-    if 10 <= n % 100 <= 20:
-        return f"{n}th"
-    return f"{n}" + {1: "st", 2: "nd", 3: "rd"}.get(n % 10, "th")
-
-
 async def _get(client: httpx.AsyncClient, url: str, timeout: float, headers: dict | None = None):
     try:
         return await client.get(url, timeout=timeout, headers=headers or {"User-Agent": UA})
@@ -76,14 +71,22 @@ async def _get(client: httpx.AsyncClient, url: str, timeout: float, headers: dic
         return None
 
 
+def congresses(congress: int | None) -> tuple[int, ...]:
+    """The one Congress a bill names, else this one and the last."""
+    if congress:
+        return (congress,)
+    now = current_congress()
+    return (now, now - 1)
+
+
 async def fetch_congress_text(client: httpx.AsyncClient, bill_no: str, timeout: float = 6):
+    bill_no, congress = split_congress(bill_no)
     parsed = parse_bill_no(bill_no)
     chamber = parsed and CONGRESS_CHAMBERS.get(parsed[0])
     pattern = bill_pattern(bill_no)
     if not chamber or not pattern:
         return None
-    congress = current_congress()
-    for c in (congress, congress - 1):
+    for c in congresses(congress):
         url = f"https://www.congress.gov/bill/{ordinal(c)}-congress/{chamber}/{parsed[1]}/text?format=txt"
         res = await _get(client, url, timeout, {"User-Agent": UA, "Accept": "text/html"})
         if not res or res.status_code != 200:
@@ -97,13 +100,13 @@ async def fetch_congress_text(client: httpx.AsyncClient, bill_no: str, timeout: 
 
 async def fetch_govinfo_text(client: httpx.AsyncClient, bill_no: str, timeout: float = 6):
     """GovInfo's link service, which answers with the newest printed version of the bill."""
+    bill_no, congress = split_congress(bill_no)
     parsed = parse_bill_no(bill_no)
     kind = parsed and GOVINFO_TYPES.get(parsed[0])
     pattern = bill_pattern(bill_no)
     if not kind or not pattern:
         return None
-    congress = current_congress()
-    for c in (congress, congress - 1):
+    for c in congresses(congress):
         url = f"https://www.govinfo.gov/link/bills/{c}/{kind}/{parsed[1]}?link-type=html"
         res = await _get(client, url, timeout)
         if not res or res.status_code != 200:
@@ -159,16 +162,19 @@ def _openstates_summary(bill: dict) -> str:
     return "\n\n".join(p for p in parts if p.strip())
 
 
+def openstates_jurisdiction(state: str) -> str:
+    return f"ocd-jurisdiction/country:us/state:{state.lower()}/government"
+
+
 async def find_openstates_bill(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
     """The bill's Open States record, newest session first, and why there is none."""
     key = settings.openstates_api_key
     parsed = parse_bill_no(bill_no)
     if not key or not parsed:
         return None, "no key" if not key else "bad number"
-    jurisdiction = f"ocd-jurisdiction/country:us/state:{state.lower()}/government"
     search = (
         "https://v3.openstates.org/bills?jurisdiction="
-        + quote(jurisdiction, safe="")
+        + quote(openstates_jurisdiction(state), safe="")
         + "&identifier="
         + quote(f"{parsed[0]} {parsed[1]}", safe="")
         + "&include=versions&include=sources&include=abstracts&sort=latest_action_desc&per_page=1"
@@ -231,6 +237,10 @@ async def fetch_bill_text(state: str, bill_no: str, budget: float = 25, tier_tim
 
 
 def official_search_url(state: str, bill_no: str) -> str:
+    base, congress = split_congress(bill_no)
+    parsed = parse_bill_no(base)
+    if state == "US" and congress and parsed and parsed[0] in CONGRESS_CHAMBERS:
+        return f"https://www.congress.gov/bill/{ordinal(congress)}-congress/{CONGRESS_CHAMBERS[parsed[0]]}/{parsed[1]}"
     if state == "US":
         return (
             "https://www.congress.gov/quick-search/legislation?wordsPhrases=&legislationNumbers="

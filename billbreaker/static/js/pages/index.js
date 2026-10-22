@@ -36,5 +36,8 @@ document.addEventListener("click", (e) => {
   openSearch(button.dataset.openSearch);
 });
 
+// "Search again" from a bill page that found nothing lands here with the dialog open.
+if (new URLSearchParams(window.location.search).has("search")) openSearch("number");
+
 // Lists above the news section change height after load; keep trigger positions honest.
 window.addEventListener("load", () => ScrollTrigger.refresh());

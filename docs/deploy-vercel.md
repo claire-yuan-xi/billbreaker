@@ -50,6 +50,9 @@ model, `?check=breakdown` to run a sample breakdown, or
 `?check=research&state=TX&bill=HB 1` to look up a bill on the web.
 `?check=fetch&state=TX&bill=HB 1` shows where a bill's text comes from, and
 `?check=bill&state=FL&bill=HB 1` runs a whole search.
+`?check=resolve&state=US&q=MI 1245|Laken Riley Act|TX:1` shows which bill
+each search box entry lands on (entries split by `|`, a `XX:` start picks the
+state).
 
 A breakdown can take a minute, so `vercel.json` turns on Fluid compute and
 lets the function run for up to 300 seconds, the free Hobby limit.

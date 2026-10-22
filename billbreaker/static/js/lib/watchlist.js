@@ -7,7 +7,8 @@ const BACKUP_VERSION = 1;
 const CHANGE_EVENT = "bb:watchlist";
 
 const STATE_RE = /^[A-Z]{2,4}$/;
-const BILL_NO_RE = /^[A-Za-z]{1,8}[.\s-]?\d{1,6}$/;
+// "HB 12", "S 3000A", or an older federal bill with its Congress: "HR 5376 (117th)".
+const BILL_NO_RE = /^[A-Za-z]{1,8}[.\s-]?\d{1,6}[A-Za-z]?(?: \(\d{1,3}(?:st|nd|rd|th)\))?$/;
 const DEVICE_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 export function isValidItem(x) {

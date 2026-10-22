@@ -204,3 +204,36 @@ def test_a_failed_for_you_still_finishes_the_breakdown(client, monkeypatch):
     asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(TEXT), "Cached", None, [{"event": "quick_take", "data": QUICK}]))
     res = post(client, profile={"age": "65+"})
     assert "event: for_you" not in res.text and "event: done" in res.text and "event: error" not in res.text
+
+
+def test_a_loose_search_is_settled_before_fetching(client, monkeypatch):
+    from billbreaker.services import bill_find
+
+    async def settle(state, raw, use_ai=True):
+        assert (state, raw) == ("US", "MI 1245")
+        return bill_find.Found(bill_find.parse_query(state, raw), bill_find.Match("MI", "SB 1245"))
+
+    async def fetch(state, bill_no):
+        assert (state, bill_no) == ("MI", "SB 1245")
+        return FetchResult(TEXT, "https://legislature.mi.gov/x", "openstates", ["openstates"])
+
+    async def fake(text, identifier):
+        assert identifier == "MI SB 1245"
+        return "Michigan bill", [{"event": "quick_take", "data": QUICK}]
+
+    monkeypatch.setattr(explain_api, "resolve", settle)
+    monkeypatch.setattr(explain_api, "fetch_bill_text", fetch)
+    monkeypatch.setattr(explain_api, "breakdown", fake)
+    body = client.post("/api/explain-bill", json={"state": "US", "billNo": "MI 1245", "mode": "json"}).json()
+    assert body["title"] == "Michigan bill"
+
+
+def test_a_search_that_matches_nothing_says_so(client, monkeypatch):
+    from billbreaker.services import bill_find
+
+    async def nothing(state, raw, use_ai=True):
+        return bill_find.Found(bill_find.parse_query(state, raw))
+
+    monkeypatch.setattr(explain_api, "resolve", nothing)
+    body = client.post("/api/explain-bill", json={"state": "US", "billNo": "A made up act", "mode": "json"}).json()
+    assert "Could not find this bill" in body["error"]

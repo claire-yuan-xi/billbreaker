@@ -9,6 +9,8 @@ from fastapi.responses import JSONResponse, StreamingResponse
 
 from ..services import analysis_cache
 from ..services.ai_client import AIError
+from ..services.bill_find import resolve
+from ..services.bill_query import parse_query
 from ..services.bill_sources import fetch_bill_text
 from ..services.explain import breakdown
 from ..services.for_you import clean_profile, tailor
@@ -17,7 +19,7 @@ from ..services.render import render_section
 from ..services.research import research_breakdown
 from ..services.sanitize import sanitize_bill_text
 from ..states import STATE_NAMES
-from ..validation import US_STATES, normalize_bill_no
+from ..validation import US_STATES
 
 log = logging.getLogger(__name__)
 router = APIRouter()
@@ -79,8 +81,7 @@ async def explain_bill(request: Request):
     except ValueError:
         body = {}
     state = str(body.get("state") or "US").upper()[:4]
-    raw_bill_no = str(body.get("billNo") or "")[:40]
-    bill_no = normalize_bill_no(raw_bill_no) if raw_bill_no.strip() else ""
+    raw_bill_no = str(body.get("billNo") or "")[:160]
     text = str(body.get("text") or "")
     as_json = body.get("mode") == "json"
     profile = clean_profile(body.get("profile"))
@@ -94,10 +95,21 @@ async def explain_bill(request: Request):
 
     if state not in US_STATES:
         return error(400, "Invalid state")
-    if bill_no is None:
-        return error(400, "Invalid bill number")
     if len(text) > MAX_TEXT:
         return error(413, "Bill text too long")
+    bill_no = ""
+    if raw_bill_no.strip():
+        # The page sends the bill /api/bill-meta settled on; anything looser is looked up here too.
+        query = parse_query(state, raw_bill_no)
+        if query.bill_no:
+            state, bill_no = query.state, query.bill_no
+        elif len(text.strip()) >= MIN_PASTED:
+            return error(400, "Invalid bill number")
+        else:
+            found = await resolve(state, raw_bill_no, use_ai=False)
+            if not found.best:
+                return error(404, _friendly("NOT_FOUND"))
+            state, bill_no = found.best.state, found.best.bill_no
 
     source_url = source = None
     tried: list[str] = []
@@ -119,7 +131,7 @@ async def explain_bill(request: Request):
     ip = client_ip(request)
     jurisdiction = "US federal" if state == "US" else STATE_NAMES.get(state, state)
     safe_state = re.sub(r"[^A-Z]", "", state)
-    safe_bill = re.sub(r"[^A-Za-z0-9.\-\s]", "", bill_no)
+    safe_bill = re.sub(r"[^A-Za-z0-9.()\-\s]", "", bill_no)
     identifier = f"{safe_state} {safe_bill}".strip() or "Pasted bill"
 
     async def for_you(title: str, sections: list[dict]) -> dict | None:

@@ -31,7 +31,10 @@ export function initStateCombobox(root, onChange) {
     if (on) {
       filter.value = "";
       applyFilter();
-      setTimeout(() => filter.focus(), 0);
+      setTimeout(() => {
+        filter.focus();
+        panel.scrollIntoView({ block: "nearest" });
+      }, 0);
     }
   }
 
@@ -44,7 +47,7 @@ export function initStateCombobox(root, onChange) {
     onChange(code);
   }
 
-  button.addEventListener("click", () => setOpen(true));
+  button.addEventListener("click", () => setOpen(panel.classList.contains("hidden")));
   options.forEach((li) => {
     li.firstElementChild.addEventListener("click", () => pick(li.dataset.code));
     li.firstElementChild.addEventListener("mouseenter", () => {

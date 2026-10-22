@@ -11,7 +11,8 @@ router = APIRouter(prefix="/api/watchlist")
 
 DEVICE = r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
 STATE = r"^[A-Z]{2,4}$"
-BILL = r"^[A-Za-z]{1,8}[.\s-]?\d{1,6}$"
+# "HB 12", "S 3000A", or an older federal bill with its Congress: "HR 5376 (117th)".
+BILL = r"^[A-Za-z]{1,8}[.\s-]?\d{1,6}[A-Za-z]?(?: \(\d{1,3}(?:st|nd|rd|th)\))?$"
 
 
 class Device(BaseModel):

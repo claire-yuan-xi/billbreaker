@@ -4,8 +4,9 @@ import { readProfile, saveProfile } from "../lib/reader-profile.js";
 import { initAboutYou } from "./about-you.js";
 import { initStateCombobox } from "./state-combobox.js";
 
-// Bill number format: letters (HB, H.B., S, AB), optional space, dot or dash, digits, optional letter.
-const BILL_NO_RE = /^[A-Za-z][A-Za-z.\s]{0,15}?[\s.-]*\d{1,6}[A-Za-z]?$/;
+// Any number or name: the server works out which bill it means.
+const MAX_QUERY = 160;
+const HINT = "Like HR 1, Michigan SB 1245, or a bill's name";
 const MIN_PASTE = 100;
 
 /** "Which bill" then "About you", ending on the bill page. Returns open(mode). */
@@ -24,22 +25,23 @@ export function initSearchDialog(dialog, stateNames) {
 
   function animateStep(step) {
     if (prefersReducedMotion()) return;
+    // clearProps drops the leftover transforms, which would otherwise layer the Next button over the state list.
     gsap.fromTo(
       step.querySelector("[data-step-body]").children,
       { opacity: 0, y: 14 },
-      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out", stagger: 0.04 },
+      { opacity: 1, y: 0, duration: 0.5, ease: "power3.out", stagger: 0.04, clearProps: "transform,opacity" },
     );
   }
 
   function validate() {
     const trimmed = billInput.value.trim();
-    const bad = trimmed.length > 0 && !BILL_NO_RE.test(trimmed);
+    const bad = trimmed.length > MAX_QUERY;
     billInput.setAttribute("aria-invalid", String(bad));
-    hint.textContent = bad ? "Try something like HR 1234" : "Like HR 1234";
+    hint.textContent = bad ? "Too long, try the bill's number" : HINT;
     hint.classList.toggle("text-destructive", bad);
-    hint.classList.toggle("text-muted-foreground", !bad);
+    hint.classList.toggle("text-foreground/70", !bad);
     pasteCount.textContent = `${paste.value.length.toLocaleString()} / 50,000`;
-    const ok = mode === "number" ? BILL_NO_RE.test(trimmed) : paste.value.trim().length >= MIN_PASTE;
+    const ok = mode === "number" ? trimmed.length > 0 && !bad : paste.value.trim().length >= MIN_PASTE;
     next.disabled = !ok;
     return ok;
   }

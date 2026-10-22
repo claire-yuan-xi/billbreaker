@@ -11,12 +11,14 @@
   </header>
 
   <div class="mx-auto max-w-3xl px-6 py-16">
-    <div data-meta-error class="hidden border-b border-t border-[#c4413a] py-6 font-serif text-sm text-[#c4413a]">
-      Could not load this bill. <button type="button" data-meta-retry class="underline">Try again.</button>
+    <div data-missing class="hidden border-b border-t border-[#d6d3ca] py-8">
+      <h1 class="font-serif text-4xl leading-tight md:text-5xl">No bill found</h1>
+      <p data-missing-text class="mt-4 font-serif text-lg leading-relaxed text-[#3a3a3a]"></p>
+      <div data-missing-others class="mt-5 flex flex-wrap gap-3 empty:hidden"></div>
+      <a href="/?search=1" class="mt-8 inline-block font-serif text-base font-semibold underline underline-offset-4">Search again</a>
     </div>
     {% include "bill/header.html" %}
     {% include "bill/reader_strip.html" %}
-    <div data-meta-notice class="mt-10 hidden border-b border-t border-[#d6d3ca] py-5 font-serif text-base leading-relaxed text-[#3a3a3a]"></div>
     {% include "bill/ai_section.html" %}
   </div>
 </main>

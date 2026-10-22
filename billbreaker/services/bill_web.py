@@ -13,6 +13,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from ..states import STATE_NAMES
+from ..validation import split_congress
 from .documents import Document, read_document
 from .web_search import search
 
@@ -121,7 +122,7 @@ async def _follow(client: httpx.AsyncClient, doc: Document, pattern: re.Pattern,
 
 async def fetch_web_text(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
     """Returns (text, first page url) from pages that name the bill, or None."""
-    pattern = bill_pattern(bill_no)
+    pattern = bill_pattern(split_congress(bill_no)[0])
     if not pattern:
         return None
     results = await search(client, query_for(state, bill_no), timeout)

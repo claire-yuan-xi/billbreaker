@@ -4,8 +4,11 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field, field_validator
 
 from ..services import shares
+from ..services.bill_find import describe, resolve
+from ..services.bill_query import parse_query
 from ..services.bill_sources import official_search_url
 from ..services.rate_limit import bump, client_ip
+from ..states import STATE_NAMES
 from ..validation import STATE, normalize_bill_no
 
 router = APIRouter()
@@ -13,7 +16,8 @@ router = APIRouter()
 
 class MetaIn(BaseModel):
     state: str = "US"
-    billNo: str = ""
+    # What the person typed: a number, a number with its state, or a bill's name.
+    billNo: str = Field(default="", max_length=160)
     hasText: bool = False
 
     @field_validator("state")
@@ -23,29 +27,30 @@ class MetaIn(BaseModel):
             raise ValueError("invalid state")
         return v
 
-    @field_validator("billNo")
-    @classmethod
-    def _bill(cls, v: str) -> str:
-        if not v.strip():
-            return ""
-        normalized = normalize_bill_no(v)
-        if not normalized:
-            raise ValueError("invalid bill number")
-        return normalized
-
 
 @router.post("/api/bill-meta")
-async def bill_meta(data: MetaIn):
-    state, bill_no = data.state, data.billNo
-    source_url = official_search_url(state, bill_no)
-    # The analysis fetches the text itself, or looks the bill up on the web.
-    notice = None
+async def bill_meta(data: MetaIn, request: Request):
+    if not data.billNo.strip():
+        return {"id": "pasted bill", "jurisdiction": data.state, "found": False, "textProvided": data.hasText}
+    query = parse_query(data.state, data.billNo)
+    use_ai = False
+    # Lookups spend the free Open States quota and a name search may ask Gemini.
+    if not (query.bill_no and query.state == "US"):
+        rl = await bump(f"ip:{client_ip(request)}:find", 60, 600, endpoint="find")
+        if not rl.allowed:
+            raise HTTPException(429, "Too many searches. Try again in a few minutes.")
+        use_ai = bool(query.words) and rl.count <= 30
+    found = await resolve(data.state, data.billNo, use_ai=use_ai)
+    best = found.best
+    state = best.state if best else found.query.state
     return {
-        "id": f"{state} {bill_no}".strip() if bill_no else "pasted bill",
+        **describe(found),
+        "id": best.bill_no if best else data.billNo.strip()[:60],
         "jurisdiction": state,
-        "sourceUrl": source_url,
+        "place": "United States Federal" if state == "US" else STATE_NAMES.get(state, state),
+        "sourceUrl": official_search_url(state, best.bill_no) if best else None,
         "textProvided": data.hasText,
-        "notice": notice,
+        "notice": None,
     }
 
 
