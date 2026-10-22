@@ -48,17 +48,18 @@ Open `/api/status` to see the deployed commit and which keys are set (never
 the keys themselves). Add `?check=ai` to see what Gemini answers for each
 model, `?check=breakdown` to run a sample breakdown, or
 `?check=research&state=TX&bill=HB 1` to look up a bill on the web.
-`?check=wait&seconds=20` shows whether a request may run that long.
+`?check=fetch&state=TX&bill=HB 1` shows where a bill's text comes from, and
+`?check=bill&state=FL&bill=HB 1` runs a whole search.
 
 A breakdown can take a minute, so `vercel.json` turns on Fluid compute and
-lets the function run for up to 300 seconds, the free Hobby limit. Without it
-Vercel cut requests off after about 10 seconds and every breakdown failed.
+lets the function run for up to 300 seconds, the free Hobby limit.
 
 ## Later
 
-- State bills: nothing to set. When no official text can be fetched, Gemini
-  looks the bill up with Google Search. `OPENSTATES_API_KEY` (free) is
-  optional and lets the site read the official text when a state publishes it
-  as a web page.
+- State bills: add `OPENSTATES_API_KEY` (free, from
+  open.pluralpolicy.com/accounts/profile) so every state's official text is
+  found, PDFs included. Without it the site searches legislature sites, which
+  finds some bills but not all. Gemini's Google Search lookup is not part of
+  the free tier, so it is only a last try.
 - Model: nothing to set. /admin/ml runs it in the browser from the Hugging Face repo clairexi/bill-breaker-t5-onnx.
 - Every push to main redeploys.

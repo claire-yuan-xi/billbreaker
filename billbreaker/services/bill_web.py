@@ -125,7 +125,9 @@ async def fetch_web_text(client: httpx.AsyncClient, state: str, bill_no: str, ti
     if not pattern:
         return None
     results = await search(client, query_for(state, bill_no), timeout)
-    candidates = [r["url"] for r in results if _public(r["url"]) and _rank(r["url"]) > 0]
+    # Only legislature sites and bill trackers: other pages that mention a bill
+    # number are often about an older bill with the same number.
+    candidates = [r["url"] for r in results if _public(r["url"]) and _rank(r["url"]) >= 3]
     candidates = sorted(dict.fromkeys(candidates), key=_rank, reverse=True)[:MAX_PAGES]
     docs = await asyncio.gather(*(read_document(client, url, timeout) for url in candidates))
     kept = [d for d in docs if len(d.text) >= MIN_CHARS and pattern.search(d.text)][:KEEP_PAGES]

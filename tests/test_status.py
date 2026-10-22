@@ -5,11 +5,6 @@ def test_status_names_the_keys_without_showing_them(client, set_setting):
     assert "secret-value" not in res.text
 
 
-def test_a_wait_check_is_recorded_even_if_the_browser_gives_up(client):
-    assert client.get("/api/status?check=wait&seconds=1").json()["wait"]["ok"] is True
-    assert client.get("/api/status?check=waited&seconds=1").json()["waited"]["finished"] is True
-
-
 def test_a_gemini_failure_shows_google_s_message(client, monkeypatch):
     from billbreaker.api import status
     from billbreaker.services.ai_client import AIError

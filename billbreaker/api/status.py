@@ -3,7 +3,6 @@ What the server is running and whether Gemini answers, so a failure on the live
 site can be read from a browser. Never shows a key, only whether one is set.
 """
 
-import asyncio
 import logging
 import os
 import time
@@ -12,7 +11,6 @@ import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
-from .. import db
 from ..config import settings
 from ..services import ai_client
 from ..services.ai_client import AIError
@@ -36,29 +34,11 @@ TTL = 120
 _cache: dict[str, tuple[float, dict]] = {}
 
 
-CHECKS = ("ai", "breakdown", "research", "fetch", "search", "bill", "wait", "waited")
+CHECKS = ("ai", "breakdown", "research", "fetch", "search", "bill")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
     return {"ok": True, "title": title, "sections": [s["event"] for s in sections]}
-
-
-async def _mark(name: str, seconds: int) -> None:
-    await db.execute(
-        "INSERT INTO rate_limits (identifier, window_start, count) VALUES (?, ?, 1) "
-        "ON CONFLICT(identifier) DO UPDATE SET window_start = excluded.window_start, count = 1",
-        (f"status-wait:{seconds}:{name}", time.time()),
-    )
-
-
-async def _waited(seconds: int) -> dict:
-    """When the last wait check started and finished, even if the browser gave up first."""
-    out = {}
-    for name in ("start", "end"):
-        row = await db.query_one("SELECT window_start FROM rate_limits WHERE identifier = ?", (f"status-wait:{seconds}:{name}",))
-        out[name] = round(row["window_start"]) if row else None
-    out["finished"] = bool(out["start"] and out["end"] and out["end"] >= out["start"])
-    return out
 
 
 async def _bill(state: str, bill: str) -> dict:
@@ -74,15 +54,7 @@ async def _bill(state: str, bill: str) -> dict:
     return {**_summary(*found[:2]), "source": "web", "tried": fetched.tried}
 
 
-async def _run(kind: str, state: str, bill: str, seconds: int, query: str = "") -> dict:
-    if kind == "wait":
-        # Shows how long the host lets one request run before it is cut off.
-        await _mark("start", seconds)
-        await asyncio.sleep(seconds)
-        await _mark("end", seconds)
-        return {"ok": True, "waited": seconds}
-    if kind == "waited":
-        return await _waited(seconds)
+async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
     if kind == "ai":
         return {"models": await ai_client.probe()}
     if kind == "breakdown":
@@ -109,10 +81,10 @@ async def _run(kind: str, state: str, bill: str, seconds: int, query: str = "") 
     return _summary(*found[:2]) if found else {"ok": False, "error": "NOT_FOUND"}
 
 
-async def _check(kind: str, state: str, bill: str, seconds: int, query: str = "") -> dict:
+async def _check(kind: str, state: str, bill: str, query: str = "") -> dict:
     started = time.monotonic()
     try:
-        result = await _run(kind, state, bill, seconds, query)
+        result = await _run(kind, state, bill, query)
     except AIError as exc:
         result = {"ok": False, "error": exc.code, "detail": exc.detail}
     except Exception as exc:  # noqa: BLE001 - the point of this page is to show the failure
@@ -123,7 +95,7 @@ async def _check(kind: str, state: str, bill: str, seconds: int, query: str = ""
 
 @router.get("/api/status")
 async def status(
-    request: Request, check: str = "", state: str = "CA", bill: str = "AB 5", seconds: int = 5, q: str = ""
+    request: Request, check: str = "", state: str = "CA", bill: str = "AB 5", q: str = ""
 ):
     out = {
         "commit": os.getenv("VERCEL_GIT_COMMIT_SHA", "")[:7] or "local",
@@ -138,11 +110,10 @@ async def status(
         return out
     bill = normalize_bill_no(bill) or "AB 5"
     state = state.upper() if state.upper() in STATE_NAMES else "CA"
-    seconds = max(1, min(seconds, 90))
     q = q.strip()[:100]
-    key = f"{check}:{state}:{bill}:{seconds}:{q}"
+    key = f"{check}:{state}:{bill}:{q}"
     hit = _cache.get(key)
-    if hit and check != "waited" and time.monotonic() - hit[0] < TTL:
+    if hit and time.monotonic() - hit[0] < TTL:
         return {**out, check: hit[1], "cached": True}
     try:
         rl = await bump(f"ip:{client_ip(request)}:status", 20, 600, endpoint="status")
@@ -150,6 +121,6 @@ async def status(
         return {**out, "error": f"rate limit store failed: {type(exc).__name__}"}
     if not rl.allowed:
         return JSONResponse({**out, "error": "Too many checks. Try again later."}, status_code=429)
-    result = await _check(check, state, bill, seconds, q)
+    result = await _check(check, state, bill, q)
     _cache[key] = (time.monotonic(), result)
     return {**out, check: result}
