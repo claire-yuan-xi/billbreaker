@@ -49,7 +49,7 @@ WIKI_UA = "BillBreaker/1.0 (https://billbreaker.org)"
 USBILL = re.compile(r"\{\{\s*USBill\s*\|\s*(\d{1,3})\s*\|\s*([A-Za-z.\s]+?)\s*\|\s*(\d+)", re.I)
 INTRODUCED = re.compile(r"introducedbill\s*=([^\n]*)", re.I)
 BILL_IN_TEXT = re.compile(r"\b(H\.?\s?J\.?\s?Res|H\.?\s?R|S\.?\s?J\.?\s?Res|S)\.?\s?(\d{1,5})\b", re.I)
-CONGRESS_LINK = re.compile(r"(\d{2,3})(?:st|nd|rd|th) United States Congress")
+CONGRESS_LINK = re.compile(r"enacted by\s*=[^\n]*?(\d{2,3})(?:st|nd|rd|th)|(\d{2,3})(?:st|nd|rd|th) United States Congress", re.I)
 SHORT_TITLE = re.compile(r"may be cited as the\s+[`'\"\u201c\u2018]+\s*([^`'\"\u201d\u2019]{3,200})", re.I)
 COMMON = {"the", "act", "of", "a", "an", "and", "for", "to", "in", "on", "bill", "law", "new", "state"}
 
@@ -236,7 +236,7 @@ def wiki_bill(wikitext: str) -> tuple[int, str, str] | None:
     if m := USBILL.search(line.group(1) if line else wikitext):
         congress, prefix, number = int(m.group(1)), m.group(2), m.group(3)
     elif line and (m := BILL_IN_TEXT.search(line.group(1))) and (c := CONGRESS_LINK.search(wikitext)):
-        congress, prefix, number = int(c.group(1)), m.group(1), m.group(2)
+        congress, prefix, number = int(c.group(1) or c.group(2)), m.group(1), m.group(2)
     else:
         return None
     prefix = re.sub(r"[.\s]", "", prefix).upper()

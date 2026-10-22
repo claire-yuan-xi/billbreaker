@@ -222,4 +222,5 @@ def test_reads_the_bill_from_an_infobox():
     assert bill_find.wiki_bill("| introducedbill = {{USBill|118|H.J.Res.|7}}") == (118, "HJRES", "7")
     box = "| enacted by = the [[119th United States Congress]]\n| introducedbill = [[wikisource:x|S. 1582]]"
     assert bill_find.wiki_bill(box) == (119, "S", "1582")
+    assert bill_find.wiki_bill("| enacted by = 119th\n| introducedbill = S. 1582") == (119, "S", "1582")
     assert bill_find.wiki_bill("no box") is None
