@@ -7,6 +7,7 @@ import asyncio
 import logging
 import os
 import time
+from datetime import date
 
 import httpx
 from fastapi import APIRouter, Request
@@ -17,10 +18,12 @@ from ..config import settings
 from ..services import ai_client
 from ..services.ai_client import AIError
 from ..services.bill_sources import fetch_bill_text
-from ..services.bill_web import query_for
+from ..services import bill_web
+from ..services.bill_web import legiscan_slug, query_for
 from ..services.explain import breakdown
 from ..services.rate_limit import bump, client_ip
 from ..services.research import research_breakdown
+from ..services.text import strip_html
 from ..services.web_search import search
 from ..states import STATE_NAMES
 from ..validation import normalize_bill_no
@@ -36,7 +39,7 @@ TTL = 120
 _cache: dict[str, tuple[float, dict]] = {}
 
 
-CHECKS = ("ai", "breakdown", "research", "fetch", "search", "bill", "wait", "waited")
+CHECKS = ("ai", "breakdown", "research", "fetch", "search", "legiscan", "bill", "wait", "waited")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -97,6 +100,20 @@ async def _run(kind: str, state: str, bill: str, seconds: int, query: str = "") 
             "chars": len(text),
             "start": text[:300],
             "tried": fetched.tried,
+        }
+    if kind == "legiscan":
+        url = f"https://legiscan.com/{state}/bill/{legiscan_slug(state, bill)}/{date.today().year - 1}"
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            res = await client.get(url, timeout=8, headers={"User-Agent": bill_web.UA, "Accept": "text/html"})
+        page = strip_html(res.text)
+        return {
+            "ok": res.status_code == 200,
+            "status": res.status_code,
+            "url": str(res.url),
+            "chars": len(page),
+            "names_bill": bool(bill_web.bill_pattern(bill).search(page)),
+            "links": bill_web.text_links(res.text, str(res.url))[:4],
+            "start": page[:200],
         }
     if kind == "search":
         text = query or query_for(state, bill)

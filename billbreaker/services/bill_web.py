@@ -73,20 +73,24 @@ def _public(url: str) -> bool:
 
 
 def _rank(url: str) -> int:
+    """Legislature sites first, then bill trackers, then other government sites."""
     host = _host(url)
     if any(host == s or host.endswith("." + s) for s in SKIP):
         return -1
-    if host.endswith((".gov", ".us")) or OFFICIAL_WORDS.search(host):
-        return 3
+    if OFFICIAL_WORDS.search(host):
+        return 4
     if any(host == t or host.endswith("." + t) for t in TRACKERS):
+        return 3
+    if host.endswith((".gov", ".us")):
         return 2
     return 1
 
 
 def query_for(state: str, bill_no: str) -> str:
+    """Names this year so the current session's bill outranks a famous old one."""
     if state == "US":
         return f"{bill_no} bill Congress"
-    return f"{STATE_NAMES.get(state, state)} legislature {bill_no} bill"
+    return f"{STATE_NAMES.get(state, state)} legislature {bill_no} {date.today().year}"
 
 
 async def _page(client: httpx.AsyncClient, url: str, timeout: float) -> str:
@@ -114,7 +118,7 @@ def text_links(page: str, base: str) -> list[str]:
     """Links on a LegiScan bill page that lead to the bill's text, the state's own first."""
     links = [urljoin(base, h) for h in HREF.findall(page)]
     links = [u for u in dict.fromkeys(links) if _public(u) and TEXT_LINK.search(urlparse(u).path or "")]
-    state_links = [u for u in links if _rank(u) == 3]
+    state_links = [u for u in links if _rank(u) in (2, 4)]
     legiscan_downloads = [u for u in links if _host(u).endswith("legiscan.com") and u.endswith(".html")]
     return state_links + legiscan_downloads
 
