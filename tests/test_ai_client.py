@@ -110,3 +110,9 @@ def test_the_native_call_sends_the_key_header_only(monkeypatch, set_setting):
     gemini(monkeypatch, set_setting, handler)
     asyncio.run(research.research_breakdown("Texas", "HB 1", "TX HB 1"))
     assert headers[0]["x-goog-api-key"] == "test-key" and "authorization" not in headers[0]
+
+
+def test_a_light_call_starts_with_the_fallback_model(monkeypatch, set_setting):
+    seen = gemini(monkeypatch, set_setting, lambda req, n: reply({"ok": 3}))
+    assert asyncio.run(ai_client.call_ai("s", "u", SCHEMA, light=True)) == {"ok": 3}
+    assert seen == ["lite-model"]

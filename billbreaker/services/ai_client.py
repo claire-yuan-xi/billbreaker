@@ -89,11 +89,14 @@ def _check(res: httpx.Response, model: str) -> None:
     raise AIError("AI_GATEWAY_ERROR", detail)
 
 
-async def _run(send: Send) -> tuple[httpx.Response, str]:
-    """Sends to each model in turn until one answers; returns that answer and its model."""
+async def _run(send: Send, light: bool = False) -> tuple[httpx.Response, str]:
+    """Sends to each model in turn until one answers; returns that answer and its model.
+
+    light starts with the fallback model, for short rewrites that do not need the main one.
+    """
     if not settings.gemini_api_key:
         raise AIError("AI_NO_KEY")
-    names = models()
+    names = models()[::-1] if light else models()
     async with httpx.AsyncClient(timeout=120, transport=_transport) as client:
         for i, model in enumerate(names):
             res = await send(client, model)
@@ -109,7 +112,7 @@ async def _run(send: Send) -> tuple[httpx.Response, str]:
     raise AIError("AI_GATEWAY_ERROR")
 
 
-async def call_ai(system: str, user: str, schema: dict) -> dict:
+async def call_ai(system: str, user: str, schema: dict, light: bool = False) -> dict:
     """One forced function call; returns its arguments."""
 
     def send(client: httpx.AsyncClient, model: str):
@@ -121,7 +124,7 @@ async def call_ai(system: str, user: str, schema: dict) -> dict:
         }
         return _post(client, OPENAI_URL, body, model)
 
-    res, model = await _run(send)
+    res, model = await _run(send, light)
     try:
         call = res.json()["choices"][0]["message"]["tool_calls"][0]
         return json.loads(call["function"]["arguments"])

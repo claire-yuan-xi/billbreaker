@@ -52,6 +52,7 @@ def _prompt(identifier: str, title: str, sections: list[dict], profile: dict) ->
 
 
 async def tailor(identifier: str, title: str, sections: list[dict], profile: dict) -> dict:
-    data = await call_ai(SYSTEM, _prompt(identifier, title, sections, profile), FOR_YOU)
+    # A short rewrite of a finished breakdown, so the lighter, faster model goes first.
+    data = await call_ai(SYSTEM, _prompt(identifier, title, sections, profile), FOR_YOU, light=True)
     points = [p for p in data.get("points") or [] if isinstance(p, dict) and p.get("effect")][:4]
     return {"summary": str(data.get("summary") or "").strip(), "points": points}
