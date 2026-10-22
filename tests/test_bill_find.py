@@ -182,3 +182,19 @@ def test_bill_meta_says_when_nothing_matches(client, monkeypatch):
 )
 def test_search_result_titles_are_cleaned(title, clean):
     assert bill_find._clean_title(title) == clean
+
+
+def test_gemini_names_the_act_when_the_web_only_finds_bills_about_it(web, monkeypatch):
+    web["duckduckgo.com"] = ddg(
+        ("https://www.congress.gov/bill/119th-congress/house-bill/300", "H.R.300 - 119th Congress (2025-2026): Inflation Reduction Act Repeal Act"),
+    )
+    web[govinfo(117, "hr", 5376)] = printed(117, "hr", 5376)
+    web["/content/pkg/"] = bill_text("Inflation Reduction Act of 2022")
+
+    async def guess(system, user, schema, light=False):
+        return {"known": True, "bill_no": "HR 5376", "congress": 117, "title": "Inflation Reduction Act"}
+
+    monkeypatch.setattr(bill_find, "call_ai", guess)
+    found = asyncio.run(resolve("US", "Inflation Reduction Act"))
+    assert found.best.bill_no == "HR 5376 (117th)"
+    assert [m.bill_no for m in found.others] == ["HR 300"]

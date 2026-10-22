@@ -209,7 +209,7 @@ async def _federal_web(client: httpx.AsyncClient, query: Query, timeout: float) 
         # The closest name first; search order breaks ties.
         kept.sort(key=lambda k: -_closeness(query.words, k[1]))
         if kept:
-            return _unique([Match("US", federal_bill(*c[:3]), c[3] or name) for c, name in kept])
+            return _unique([Match("US", federal_bill(*c[:3]), name) for c, name in kept])
     return []
 
 
@@ -323,9 +323,8 @@ async def _guess(client: httpx.AsyncClient, query: Query, timeout: float) -> lis
         prefix = {"HB": "HR", "SB": "S"}.get(prefix, prefix)
         congress = int(data.get("congress") or 0) or current_congress()
         # Gemini's own title is no proof, so the bill's text has to name itself that way.
-        if not number.isdigit() or not await _named(client, query.words, congress, prefix, number, "", timeout):
-            return []
-        return [Match("US", federal_bill(congress, prefix, number), title)]
+        name = number.isdigit() and await _named(client, query.words, congress, prefix, number, "", timeout)
+        return [Match("US", federal_bill(congress, prefix, number), name)] if name else []
     bill, _why = await find_openstates_bill(client, query.state, bill_no, timeout)
     if not bill or not _fits(query.words, bill.get("title") or ""):
         return []
@@ -344,8 +343,16 @@ async def resolve(state: str, raw: str, use_ai: bool = True, timeout: float = 6)
     async with httpx.AsyncClient(follow_redirects=True) as client:
         if query.bill_no:
             return await _typed_state(client, query, timeout)
+        if query.state == "US" and query.words:
+            matches = await _federal_web(client, query, timeout)
+            # Bills that amend an act share its name, so unless the name matched exactly, Gemini
+            # names the act itself, and the closest checked name wins.
+            if use_ai and not (matches and _closeness(query.words, matches[0].title) == 1):
+                matches = _unique(matches + await _guess(client, query, timeout))
+                matches.sort(key=lambda m: -_closeness(query.words, m.title))
+            return Found(query, matches[0], matches[1:MAX_MATCHES]) if matches else Found(query)
         if query.state == "US":
-            finders = [_federal_number] if query.number else [_federal_web]
+            finders = [_federal_number]
         else:
             finders = [_state_number, _state_web] if query.number else [_state_words, _state_web]
         if query.words and use_ai:
