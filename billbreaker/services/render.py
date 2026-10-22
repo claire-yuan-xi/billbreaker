@@ -3,6 +3,8 @@
 from ..templating import templates
 
 ORDER = ["quick_take", "status_quo_diff", "winners_losers", "supporters_vs_critics", "citations"]
+# Written for one reader, so never cached or shared.
+PERSONAL = ["for_you"]
 
 # Shared pages store sections under shorter keys.
 SHARE_KEYS = {
@@ -31,7 +33,7 @@ def _columns(event: str, data: dict):
 
 
 def render_section(event: str, data: dict) -> str:
-    if event not in ORDER or not isinstance(data, dict):
+    if event not in ORDER + PERSONAL or not isinstance(data, dict):
         return ""
     if event in ("winners_losers", "supporters_vs_critics"):
         template = templates.get_template("analysis/_two_columns.html")

@@ -1,5 +1,6 @@
 // The "about you" answers from the search flow. Personal data, so it lives in
-// sessionStorage only: never in the URL, and gone when the tab closes.
+// sessionStorage only: never in the URL, and gone when the tab closes. It is sent
+// with a breakdown request to write the "For you" section, and never stored there.
 
 const KEY = "bb_reader_v1";
 

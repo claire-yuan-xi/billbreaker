@@ -16,5 +16,6 @@ export function initReaderStrip(strip) {
   strip.querySelector("[data-forget]").addEventListener("click", () => {
     clearProfile();
     strip.classList.replace("flex", "hidden");
+    document.querySelector('[data-block="for_you"]')?.replaceChildren();
   });
 }

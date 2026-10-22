@@ -1,6 +1,7 @@
 import { postJSON } from "../lib/api.js";
 import { saveRecent } from "../lib/recent.js";
 import { wirePress } from "../lib/press.js";
+import { readProfile } from "../lib/reader-profile.js";
 import { cachedBadgeText } from "./cached-badge.js";
 import { initPublish, initShareLink } from "./publish.js";
 import { initReaderStrip } from "./reader-strip.js";
@@ -129,6 +130,11 @@ export function initBillPage(page) {
       if (number && !model.error) initPublish(q("[data-publish-wrap]"), shareBody);
       return;
     }
+    // Written for this reader from their answers, so it is never published with the rest.
+    if (event === "for_you") {
+      q('[data-block="for_you"]').innerHTML = payload.html;
+      return;
+    }
     if (event in SHARE_KEYS) {
       const { html, ...data } = payload;
       model.sections[event] = data;
@@ -154,6 +160,6 @@ export function initBillPage(page) {
   loadMeta();
   if (number || text.trim().length >= MIN_TEXT) {
     setStatus(number && text.trim().length < MIN_TEXT ? "Fetching the bill" : "Reading the bill");
-    runExplain({ state, billNo: number, text }, onEvent);
+    runExplain({ state, billNo: number, text, profile: readProfile() }, onEvent);
   }
 }

@@ -18,6 +18,7 @@ from ..services.bill_sources import openstates_links, fetch_bill_text, find_open
 from ..services.documents import read_document
 from ..services.bill_web import query_for
 from ..services.explain import breakdown
+from ..services.for_you import tailor
 from ..services.rate_limit import bump, client_ip
 from ..services.research import research_breakdown
 from ..services.web_search import search
@@ -26,6 +27,13 @@ from ..validation import normalize_bill_no
 
 log = logging.getLogger(__name__)
 router = APIRouter()
+SAMPLE_READER = {"state": "Texas", "age": "25-44", "work": "Teacher", "interests": "Libraries"}
+SAMPLE_SECTIONS = [
+    {
+        "event": "quick_take",
+        "data": {"tldr": "Libraries that take a federal grant stay open until 9 p.m. on weekdays.", "timeline": "2027"},
+    }
+]
 SAMPLE = (
     "SEC. 1. SHORT TITLE. This Act may be cited as the Library Hours Act. SEC. 2. HOURS. Each public "
     "library that receives a grant under this Act shall stay open until 9 p.m. on weekdays. SEC. 3. "
@@ -35,7 +43,7 @@ TTL = 120
 _cache: dict[str, tuple[float, dict]] = {}
 
 
-CHECKS = ("ai", "breakdown", "research", "fetch", "openstates", "search", "bill")
+CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -58,6 +66,9 @@ async def _bill(state: str, bill: str) -> dict:
 async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
     if kind == "ai":
         return {"models": await ai_client.probe()}
+    if kind == "foryou":
+        mine = await tailor("Sample bill", "Library Hours Act", SAMPLE_SECTIONS, SAMPLE_READER)
+        return {"ok": bool(mine["summary"]), **mine}
     if kind == "breakdown":
         return _summary(*await breakdown(SAMPLE, "Sample bill"))
     if kind == "fetch":

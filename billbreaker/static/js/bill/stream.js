@@ -1,6 +1,6 @@
 // Runs the AI breakdown: server-sent events first, one JSON call as the fallback.
 
-const SECTIONS = ["quick_take", "winners_losers", "citations", "supporters_vs_critics", "status_quo_diff"];
+const SECTIONS = ["quick_take", "winners_losers", "citations", "supporters_vs_critics", "status_quo_diff", "for_you"];
 const STALL_MS = 150_000;
 
 /**

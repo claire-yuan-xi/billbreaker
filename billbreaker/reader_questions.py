@@ -1,6 +1,8 @@
 """
 The "about you" questions from the Bill Breaker Colab notebook, shown in the search
-dialog. Every one is optional; answers stay in the reader's browser tab.
+dialog. Every one is optional. Answers stay in the reader's browser tab and are sent
+only with a breakdown request, to write its "For you" section; the server never
+stores them.
 """
 
 QUESTIONS = [

@@ -11,6 +11,7 @@ from ..services import analysis_cache
 from ..services.ai_client import AIError
 from ..services.bill_sources import fetch_bill_text
 from ..services.explain import breakdown
+from ..services.for_you import clean_profile, tailor
 from ..services.rate_limit import bump, client_ip
 from ..services.render import render_section
 from ..services.research import research_breakdown
@@ -35,9 +36,10 @@ def section_event(event: str, data: dict) -> str:
     return sse(event, {**data, "html": render_section(event, data)})
 
 
-def _flat(payload: dict, **extra) -> dict:
+def _flat(payload: dict, mine: dict | None = None, **extra) -> dict:
     out = {"title": payload.get("title"), "sourceUrl": payload.get("sourceUrl"), **extra, "html": {}}
-    for section in payload.get("sections", []):
+    sections = payload.get("sections", []) + ([{"event": "for_you", "data": mine}] if mine else [])
+    for section in sections:
         out[section["event"]] = section["data"]
         out["html"][section["event"]] = render_section(section["event"], section["data"])
     return out
@@ -81,6 +83,7 @@ async def explain_bill(request: Request):
     bill_no = normalize_bill_no(raw_bill_no) if raw_bill_no.strip() else ""
     text = str(body.get("text") or "")
     as_json = body.get("mode") == "json"
+    profile = clean_profile(body.get("profile"))
 
     def error(status: int, message: str, headers: dict | None = None):
         if as_json or status in (400, 413, 429):
@@ -113,6 +116,32 @@ async def explain_bill(request: Request):
     text_hash = analysis_cache.hash_text(text)
     cache_bill = bill_no or f"paste-{text_hash[:8]}"
     source_meta = {"source": source, "tried": tried}
+    ip = client_ip(request)
+    jurisdiction = "US federal" if state == "US" else STATE_NAMES.get(state, state)
+    safe_state = re.sub(r"[^A-Z]", "", state)
+    safe_bill = re.sub(r"[^A-Za-z0-9.\-\s]", "", bill_no)
+    identifier = f"{safe_state} {safe_bill}".strip() or "Pasted bill"
+
+    async def for_you(title: str, sections: list[dict]) -> dict | None:
+        """The reader's own section; left out quietly when there are no answers or it fails."""
+        if not profile or not sections:
+            return None
+        rl = await bump(f"ip:{ip}:for-you", 20, 600, endpoint="for-you")
+        if not rl.allowed:
+            return None
+        try:
+            return await tailor(identifier, title, sections, profile)
+        except Exception as exc:  # noqa: BLE001 - the breakdown itself already arrived
+            log.error("for you failed: %s", getattr(exc, "code", type(exc).__name__))
+            return None
+
+    async def for_you_events(title: str, sections: list[dict]):
+        if not profile:
+            return
+        yield sse("status", {"stage": "for_you", "message": "Tailoring this to your answers"})
+        mine = await for_you(title, sections)
+        if mine:
+            yield section_event("for_you", mine)
 
     # 1) Cache hit: free to anyone, no rate limit.
     try:
@@ -122,18 +151,20 @@ async def explain_bill(request: Request):
         cached = None
     if cached:
         if as_json:
-            return JSONResponse(_flat(cached, cached=True, **source_meta), headers={"Cache-Control": "no-store"})
+            mine = await for_you(cached["title"], cached["sections"])
+            return JSONResponse(_flat(cached, mine, cached=True, **source_meta), headers={"Cache-Control": "no-store"})
 
-        def replay():
+        async def replay():
             yield sse("meta", {"title": cached["title"], "sourceUrl": cached["sourceUrl"], "cached": True, **source_meta})
             for s in cached["sections"]:
                 yield section_event(s["event"], s["data"])
+            async for event in for_you_events(cached["title"], cached["sections"]):
+                yield event
             yield sse("done", {"cached": True})
 
         return StreamingResponse(replay(), media_type="text/event-stream", headers={"Cache-Control": "no-cache"})
 
     # 2) Per-IP limits on cache misses, fail closed.
-    ip = client_ip(request)
     for key, limit, window, message in (
         ("1m", 15, 60, "Too many requests. Try again in a minute."),
         ("10m", 40, 600, "Hourly limit reached. Try again shortly."),
@@ -143,10 +174,6 @@ async def explain_bill(request: Request):
             return error(429, message, {"Retry-After": str(rl.retry_after)})
 
     bill = "" if research else sanitize_bill_text(text)
-    jurisdiction = "US federal" if state == "US" else STATE_NAMES.get(state, state)
-    safe_state = re.sub(r"[^A-Z]", "", state)
-    safe_bill = re.sub(r"[^A-Za-z0-9.\-\s]", "", bill_no)
-    identifier = f"{safe_state} {safe_bill}".strip() or "Pasted bill"
 
     async def stale(code: str):
         """The last good analysis of this bill, with why it is being shown."""
@@ -189,7 +216,8 @@ async def explain_bill(request: Request):
             return JSONResponse({"error": _friendly(code)}, status_code=503)
         await _save_quietly(state, cache_bill, text_hash, title, source_url, sections)
         payload = {"title": title, "sourceUrl": source_url, "sections": sections}
-        return JSONResponse(_flat(payload, cached=False, **source_meta), headers={"Cache-Control": "no-store"})
+        mine = await for_you(title, sections)
+        return JSONResponse(_flat(payload, mine, cached=False, **source_meta), headers={"Cache-Control": "no-store"})
 
     async def stream():
         message = "Looking up the bill and writing the breakdown" if research else "Reading the bill and writing the breakdown"
@@ -213,7 +241,9 @@ async def explain_bill(request: Request):
         yield sse("meta", {"title": title, "sourceUrl": source_url, "cached": False, **source_meta})
         for s in sections:
             yield section_event(s["event"], s["data"])
-        yield sse("done", {"cached": False})
         await _save_quietly(state, cache_bill, text_hash, title, source_url, sections)
+        async for event in for_you_events(title, sections):
+            yield event
+        yield sse("done", {"cached": False})
 
     return StreamingResponse(stream(), media_type="text/event-stream", headers=SSE_HEADERS)

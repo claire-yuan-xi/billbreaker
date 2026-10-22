@@ -75,3 +75,14 @@ STATUS_QUO = {
         }
     ),
 }
+
+FOR_YOU = {
+    "name": "for_you",
+    "description": "How the bill could touch one reader, from their own answers.",
+    "parameters": _obj(
+        {
+            "summary": STRING,
+            "points": _list_of({"topic": STRING, "effect": STRING}),
+        }
+    ),
+}

@@ -150,3 +150,57 @@ def test_a_search_gemini_refuses_reads_as_not_found(client, monkeypatch):
     monkeypatch.setattr(explain_api, "research_breakdown", refused)
     body = client.post("/api/explain-bill", json={"state": "OH", "billNo": "HB 98", "mode": "json"}).json()
     assert "Could not find this bill" in body["error"]
+
+
+PROFILE = {"state": "Texas", "age": "25-44", "health": "Marketplace", "ssn": "123-45-6789", "work": "x" * 500}
+MINE = {"summary": "Your premiums could change.", "points": [{"topic": "Health coverage", "effect": "Marketplace plans shift."}]}
+
+
+def test_answers_add_a_for_you_section_that_is_never_cached(client, monkeypatch):
+    seen = {}
+
+    async def fake_breakdown(bill, identifier):
+        return "A bill", [{"event": "quick_take", "data": QUICK}]
+
+    async def fake_tailor(identifier, title, sections, profile):
+        seen.update(profile)
+        return MINE
+
+    monkeypatch.setattr(explain_api, "breakdown", fake_breakdown)
+    monkeypatch.setattr(explain_api, "tailor", fake_tailor)
+    res = post(client, text="q" * 300, profile=PROFILE)
+    assert "event: for_you" in res.text and "Marketplace plans shift." in res.text
+    assert res.text.index("event: for_you") < res.text.index("event: done")
+    assert "ssn" not in seen and len(seen["work"]) == 80
+    cached = asyncio.run(analysis_cache.load_latest("US", "HR 1"))
+    assert "for_you" not in json.dumps(cached)
+
+
+def test_a_cached_breakdown_is_still_tailored_in_json(client, monkeypatch):
+    async def fake_tailor(identifier, title, sections, profile):
+        return MINE
+
+    monkeypatch.setattr(explain_api, "tailor", fake_tailor)
+    asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(TEXT), "Cached", None, [{"event": "quick_take", "data": QUICK}]))
+    body = post(client, mode="json", profile={"age": "65+"}).json()
+    assert body["for_you"] == MINE and "Your premiums could change." in body["html"]["for_you"]
+
+
+def test_no_answers_means_no_for_you_call(client, monkeypatch):
+    async def never(*args):
+        raise AssertionError("tailor should not run")
+
+    monkeypatch.setattr(explain_api, "tailor", never)
+    asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(TEXT), "Cached", None, [{"event": "quick_take", "data": QUICK}]))
+    res = post(client, profile={})
+    assert "event: for_you" not in res.text and "event: done" in res.text
+
+
+def test_a_failed_for_you_still_finishes_the_breakdown(client, monkeypatch):
+    async def failing(*args):
+        raise AIError("RATE_LIMIT")
+
+    monkeypatch.setattr(explain_api, "tailor", failing)
+    asyncio.run(analysis_cache.save("US", "HR 1", analysis_cache.hash_text(TEXT), "Cached", None, [{"event": "quick_take", "data": QUICK}]))
+    res = post(client, profile={"age": "65+"})
+    assert "event: for_you" not in res.text and "event: done" in res.text and "event: error" not in res.text
