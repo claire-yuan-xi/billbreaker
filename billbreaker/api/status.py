@@ -21,7 +21,7 @@ from ..services.bill_web import query_for
 from ..services.explain import breakdown
 from ..services.rate_limit import bump, client_ip
 from ..services.research import research_breakdown
-from ..services.web_search import ENGINES, search
+from ..services.web_search import search
 from ..states import STATE_NAMES
 from ..validation import normalize_bill_no
 
@@ -99,12 +99,10 @@ async def _run(kind: str, state: str, bill: str, seconds: int, query: str = "") 
             "tried": fetched.tried,
         }
     if kind == "search":
-        out = {"query": query or query_for(state, bill)}
+        text = query or query_for(state, bill)
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            for name in ENGINES:
-                _engine, results = await search(client, out["query"], engines=(name,))
-                out[name] = [r["url"] for r in results[:8]]
-        return out
+            results = await search(client, text)
+        return {"ok": bool(results), "query": text, "results": [r["url"] for r in results[:8]]}
     if kind == "bill":
         return await _bill(state, bill)
     found = await research_breakdown(STATE_NAMES.get(state, state), bill, f"{state} {bill}")

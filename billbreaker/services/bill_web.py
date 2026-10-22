@@ -1,12 +1,14 @@
 """
-Finds a bill on the open web when no official source answered: searches for it,
-reads the best few pages that name the bill, and returns their text.
+Finds a bill on the open web when no official source answered: first LegiScan's
+public page for it (which links to the state's own text), then a web search,
+reading the best few pages that name the bill.
 """
 
 import asyncio
 import ipaddress
 import re
-from urllib.parse import urlparse
+from datetime import date
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
@@ -34,6 +36,8 @@ TRACKERS = (
 )
 SKIP = ("youtube.com", "facebook.com", "x.com", "twitter.com", "instagram.com", "tiktok.com", "reddit.com", "linkedin.com")
 OFFICIAL_WORDS = re.compile(r"legis|senate|house|assembly|capitol|statehouse", re.I)
+HREF = re.compile(r'href="([^"#]+)"', re.I)
+TEXT_LINK = re.compile(r"\.(?:htm|html|txt)$|billtext|/text/", re.I)
 LONG_NAMES = {"HB": "House Bill", "SB": "Senate Bill", "AB": "Assembly Bill", "HR": "H.R.", "S": "S."}
 
 
@@ -97,12 +101,57 @@ async def _page(client: httpx.AsyncClient, url: str, timeout: float) -> str:
     return strip_html(res.text)
 
 
+def legiscan_slug(state: str, bill_no: str) -> str:
+    """HB1 as LegiScan writes it; New York pads the number to five digits (S00001)."""
+    m = re.match(r"([A-Z]+)\s*0*(\d+)([A-Z]?)$", bill_no.upper().replace(".", "").strip())
+    if not m:
+        return bill_no.upper().replace(" ", "")
+    number = m.group(2).zfill(5) if state == "NY" else m.group(2)
+    return f"{m.group(1)}{number}{m.group(3)}"
+
+
+def text_links(page: str, base: str) -> list[str]:
+    """Links on a LegiScan bill page that lead to the bill's text, the state's own first."""
+    links = [urljoin(base, h) for h in HREF.findall(page)]
+    links = [u for u in dict.fromkeys(links) if _public(u) and TEXT_LINK.search(urlparse(u).path or "")]
+    state_links = [u for u in links if _rank(u) == 3]
+    legiscan_downloads = [u for u in links if _host(u).endswith("legiscan.com") and u.endswith(".html")]
+    return state_links + legiscan_downloads
+
+
+async def fetch_legiscan_text(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
+    """LegiScan's page for the bill this session or last, plus the text it links to."""
+    pattern = bill_pattern(bill_no)
+    if not pattern or state == "US":
+        return None
+    slug = legiscan_slug(state, bill_no)
+    year = date.today().year
+    for y in (year, year - 1):
+        url = f"https://legiscan.com/{state}/bill/{slug}/{y}"
+        try:
+            res = await client.get(url, timeout=timeout, headers={"User-Agent": UA, "Accept": "text/html"})
+        except httpx.HTTPError:
+            continue
+        summary = strip_html(res.text) if res.status_code == 200 else ""
+        if len(summary) < MIN_CHARS or not pattern.search(summary):
+            continue
+        for link in text_links(res.text, str(res.url))[:2]:
+            body = await _page(client, link, timeout)
+            if len(body) >= MIN_CHARS and pattern.search(body):
+                return f"Source: {link}\n{body[:PAGE_CHARS * 2]}\n\nSource: {url}\n{summary[:PAGE_CHARS // 4]}", link
+        return f"Source: {url}\n{summary[:PAGE_CHARS]}", url
+    return None
+
+
 async def fetch_web_text(client: httpx.AsyncClient, state: str, bill_no: str, timeout: float = 6):
     """Returns (text, first page url) from pages that name the bill, or None."""
+    found = await fetch_legiscan_text(client, state, bill_no, timeout)
+    if found:
+        return found
     pattern = bill_pattern(bill_no)
     if not pattern:
         return None
-    _engine, results = await search(client, query_for(state, bill_no), timeout)
+    results = await search(client, query_for(state, bill_no), timeout)
     candidates = [r["url"] for r in results if _public(r["url"]) and _rank(r["url"]) > 0]
     candidates = sorted(dict.fromkeys(candidates), key=_rank, reverse=True)[:MAX_PAGES]
     pages = await asyncio.gather(*(_page(client, url, timeout) for url in candidates))
