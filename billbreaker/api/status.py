@@ -21,7 +21,7 @@ from ..services.bill_web import query_for
 from ..services.explain import breakdown
 from ..services.rate_limit import bump, client_ip
 from ..services.research import research_breakdown
-from ..services.web_search import search
+from ..services.web_search import ENGINES, search
 from ..states import STATE_NAMES
 from ..validation import normalize_bill_no
 
@@ -74,7 +74,7 @@ async def _bill(state: str, bill: str) -> dict:
     return {**_summary(*found[:2]), "source": "web", "tried": fetched.tried}
 
 
-async def _run(kind: str, state: str, bill: str, seconds: int) -> dict:
+async def _run(kind: str, state: str, bill: str, seconds: int, query: str = "") -> dict:
     if kind == "wait":
         # Shows how long the host lets one request run before it is cut off.
         await _mark("start", seconds)
@@ -99,19 +99,22 @@ async def _run(kind: str, state: str, bill: str, seconds: int) -> dict:
             "tried": fetched.tried,
         }
     if kind == "search":
+        out = {"query": query or query_for(state, bill)}
         async with httpx.AsyncClient(follow_redirects=True) as client:
-            engine, results = await search(client, query_for(state, bill))
-        return {"ok": bool(results), "engine": engine, "results": [r["url"] for r in results[:8]]}
+            for name in ENGINES:
+                _engine, results = await search(client, out["query"], engines=(name,))
+                out[name] = [r["url"] for r in results[:8]]
+        return out
     if kind == "bill":
         return await _bill(state, bill)
     found = await research_breakdown(STATE_NAMES.get(state, state), bill, f"{state} {bill}")
     return _summary(*found[:2]) if found else {"ok": False, "error": "NOT_FOUND"}
 
 
-async def _check(kind: str, state: str, bill: str, seconds: int) -> dict:
+async def _check(kind: str, state: str, bill: str, seconds: int, query: str = "") -> dict:
     started = time.monotonic()
     try:
-        result = await _run(kind, state, bill, seconds)
+        result = await _run(kind, state, bill, seconds, query)
     except AIError as exc:
         result = {"ok": False, "error": exc.code, "detail": exc.detail}
     except Exception as exc:  # noqa: BLE001 - the point of this page is to show the failure
@@ -121,7 +124,9 @@ async def _check(kind: str, state: str, bill: str, seconds: int) -> dict:
 
 
 @router.get("/api/status")
-async def status(request: Request, check: str = "", state: str = "CA", bill: str = "AB 5", seconds: int = 5):
+async def status(
+    request: Request, check: str = "", state: str = "CA", bill: str = "AB 5", seconds: int = 5, q: str = ""
+):
     out = {
         "commit": os.getenv("VERCEL_GIT_COMMIT_SHA", "")[:7] or "local",
         "keys": {
@@ -136,7 +141,8 @@ async def status(request: Request, check: str = "", state: str = "CA", bill: str
     bill = normalize_bill_no(bill) or "AB 5"
     state = state.upper() if state.upper() in STATE_NAMES else "CA"
     seconds = max(1, min(seconds, 90))
-    key = f"{check}:{state}:{bill}:{seconds}"
+    q = q.strip()[:100]
+    key = f"{check}:{state}:{bill}:{seconds}:{q}"
     hit = _cache.get(key)
     if hit and check != "waited" and time.monotonic() - hit[0] < TTL:
         return {**out, check: hit[1], "cached": True}
@@ -146,6 +152,6 @@ async def status(request: Request, check: str = "", state: str = "CA", bill: str
         return {**out, "error": f"rate limit store failed: {type(exc).__name__}"}
     if not rl.allowed:
         return JSONResponse({**out, "error": "Too many checks. Try again later."}, status_code=429)
-    result = await _check(check, state, bill, seconds)
+    result = await _check(check, state, bill, seconds, q)
     _cache[key] = (time.monotonic(), result)
     return {**out, check: result}

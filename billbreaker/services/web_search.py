@@ -5,7 +5,7 @@ Used to find a page about a bill when no official source answered.
 
 import html
 import re
-from urllib.parse import parse_qs, quote, urlparse
+from urllib.parse import parse_qs, quote_plus, urlparse
 
 import httpx
 
@@ -44,13 +44,19 @@ def parse_ddg(page: str) -> list[dict]:
     return results
 
 
-async def search(client: httpx.AsyncClient, query: str, timeout: float = 6) -> tuple[str, list[dict]]:
+ENGINES = {
+    "bing": ("https://www.bing.com/search?format=rss&count=20&q={q}", parse_bing),
+    "duckduckgo": ("https://html.duckduckgo.com/html/?q={q}", parse_ddg),
+}
+
+
+async def search(
+    client: httpx.AsyncClient, query: str, timeout: float = 6, engines: tuple[str, ...] = ("bing", "duckduckgo")
+) -> tuple[str, list[dict]]:
     """Returns which engine answered and its results, best first."""
-    engines = (
-        ("bing", f"https://www.bing.com/search?format=rss&count=20&q={quote(query, safe='')}", parse_bing),
-        ("duckduckgo", f"https://html.duckduckgo.com/html/?q={quote(query, safe='')}", parse_ddg),
-    )
-    for name, url, parse in engines:
+    for name in engines:
+        template, parse = ENGINES[name]
+        url = template.format(q=quote_plus(query))
         try:
             res = await client.get(url, timeout=timeout, headers={"User-Agent": UA, "Accept-Language": "en-US"})
         except httpx.HTTPError:
