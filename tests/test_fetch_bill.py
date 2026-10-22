@@ -18,7 +18,7 @@ def test_ordinals():
 
 
 def test_congress_text_is_fetched_and_stripped():
-    page = "<html><body><pre>" + "SEC. 1. SHORT TITLE. " * 40 + "</pre></body></html>"
+    page = "<html><body><pre>H. R. 1\n" + "SEC. 1. SHORT TITLE. " * 40 + "</pre></body></html>"
 
     def handler(request):
         return httpx.Response(200, text=page)
@@ -30,7 +30,7 @@ def test_congress_text_is_fetched_and_stripped():
     result = asyncio.run(run())
     assert result is not None
     text, url = result
-    assert text.startswith("SEC. 1. SHORT TITLE.")
+    assert text.startswith("H. R. 1")
     assert "congress.gov" in url
 
 
@@ -65,3 +65,29 @@ def test_openstates_hosts_include_legislature_sites_off_gov():
     assert bill_sources._openstates_target_ok("https://legislature.maine.gov/x")
     assert bill_sources._openstates_target_ok("https://www.kslegislature.org/li/b2025_26/measures/hb2001/")
     assert not bill_sources._openstates_target_ok("https://example.com/x")
+
+
+def fetch_govinfo(handler, bill_no="HR 1"):
+    async def run():
+        async with httpx.AsyncClient(transport=httpx.MockTransport(handler), follow_redirects=True) as client:
+            return await bill_sources.fetch_govinfo_text(client, bill_no)
+
+    return asyncio.run(run())
+
+
+def test_govinfo_follows_its_link_service_to_the_newest_version():
+    text = "<pre>[Congressional Bills 119th Congress]\nH.R.1\n" + "SEC. 1. SHORT TITLE. " * 40 + "</pre>"
+
+    def handler(request):
+        if request.url.path.startswith("/link/bills/") and request.url.path.endswith("/hr/1"):
+            return httpx.Response(302, headers={"location": "https://www.govinfo.gov/content/pkg/BILLS-119hr1enr/html/BILLS-119hr1enr.htm"})
+        return httpx.Response(200, text=text)
+
+    found, url = fetch_govinfo(handler)
+    assert "SEC. 1. SHORT TITLE." in found
+    assert url == "https://www.govinfo.gov/app/details/BILLS-119hr1enr"
+
+
+def test_a_govinfo_page_not_found_is_not_bill_text():
+    missing = "<title>Page Not Found | GovInfo</title>" + "<p>Search our collections.</p>" * 50
+    assert fetch_govinfo(lambda request: httpx.Response(200, text=missing)) is None

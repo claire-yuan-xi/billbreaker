@@ -15,7 +15,9 @@ def test_vercel_installs_every_requirement():
     import tomllib
     from pathlib import Path
 
+    def names(lines):
+        return {re.split(r"[<>=\[ ]", line.strip())[0].lower() for line in lines if line.strip() and not line.startswith("#")}
+
     root = Path(__file__).resolve().parent.parent
-    names = lambda lines: {re.split(r"[<>=\[ ]", l.strip())[0].lower() for l in lines if l.strip() and not l.startswith("#")}
     project = names(tomllib.loads((root / "pyproject.toml").read_text())["project"]["dependencies"])
     assert names((root / "requirements.txt").read_text().splitlines()) <= project

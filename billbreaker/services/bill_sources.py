@@ -1,6 +1,6 @@
 """
 Best-effort bill text fetcher with a fallback chain, each tier with its own timeout:
-Congress.gov then GovInfo for federal bills, OpenStates for state bills, then a
+GovInfo then Congress.gov for federal bills, OpenStates for state bills, then a
 web search for either.
 """
 
@@ -13,7 +13,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from ..config import settings
-from .bill_web import OFFICIAL_WORDS, fetch_web_text
+from .bill_web import OFFICIAL_WORDS, bill_pattern, fetch_web_text
 from .documents import read_document
 from .text import strip_html
 
@@ -42,7 +42,6 @@ GOVINFO_TYPES = {
     "SJRES": "sjres",
     "SCONRES": "sconres",
 }
-GOVINFO_VERSIONS = ("ih", "is", "rh", "rs", "enr")
 OPENSTATES_HOSTS = (".gov", ".us", "legiscan.com", "openstates.org")
 PRIVATE_HOST = re.compile(r"^(localhost|127\.|10\.|192\.168\.|169\.254\.|::1|fc00:|fd00:)", re.I)
 
@@ -80,7 +79,8 @@ async def _get(client: httpx.AsyncClient, url: str, timeout: float, headers: dic
 async def fetch_congress_text(client: httpx.AsyncClient, bill_no: str, timeout: float = 6):
     parsed = parse_bill_no(bill_no)
     chamber = parsed and CONGRESS_CHAMBERS.get(parsed[0])
-    if not chamber:
+    pattern = bill_pattern(bill_no)
+    if not chamber or not pattern:
         return None
     congress = current_congress()
     for c in (congress, congress - 1):
@@ -90,27 +90,29 @@ async def fetch_congress_text(client: httpx.AsyncClient, bill_no: str, timeout: 
             continue
         pre = re.search(r"<pre[^>]*>([\s\S]*?)</pre>", res.text, re.I)
         text = strip_html(pre.group(1) if pre else res.text)
-        if len(text) > MIN_CHARS:
+        if len(text) > MIN_CHARS and pattern.search(text[:3000]):
             return text, url.replace("?format=txt", "")
     return None
 
 
 async def fetch_govinfo_text(client: httpx.AsyncClient, bill_no: str, timeout: float = 6):
+    """GovInfo's link service, which answers with the newest printed version of the bill."""
     parsed = parse_bill_no(bill_no)
     kind = parsed and GOVINFO_TYPES.get(parsed[0])
-    if not kind:
+    pattern = bill_pattern(bill_no)
+    if not kind or not pattern:
         return None
     congress = current_congress()
     for c in (congress, congress - 1):
-        for version in GOVINFO_VERSIONS:
-            pkg = f"BILLS-{c}{kind}{parsed[1]}{version}"
-            url = f"https://www.govinfo.gov/content/pkg/{pkg}/html/{pkg}.htm"
-            res = await _get(client, url, timeout)
-            if not res or res.status_code != 200:
-                continue
-            text = strip_html(res.text)
-            if len(text) > MIN_CHARS:
-                return text, f"https://www.govinfo.gov/app/details/{pkg}"
+        url = f"https://www.govinfo.gov/link/bills/{c}/{kind}/{parsed[1]}?link-type=html"
+        res = await _get(client, url, timeout)
+        if not res or res.status_code != 200:
+            continue
+        text = strip_html(res.text)
+        # A missing bill still answers 200 with a "Page Not Found" page.
+        if len(text) > MIN_CHARS and pattern.search(text[:3000]):
+            pkg = re.search(r"BILLS-[0-9a-z]+", str(res.url))
+            return text, f"https://www.govinfo.gov/app/details/{pkg.group(0)}" if pkg else url
     return None
 
 
@@ -191,8 +193,8 @@ async def fetch_bill_text(state: str, bill_no: str, budget: float = 25, tier_tim
 
     if state == "US":
         tiers = [
-            ("congress.gov", lambda c, t: fetch_congress_text(c, bill_no, t)),
             ("govinfo", lambda c, t: fetch_govinfo_text(c, bill_no, t)),
+            ("congress.gov", lambda c, t: fetch_congress_text(c, bill_no, t)),
         ]
     else:
         tiers = [("openstates", lambda c, t: fetch_openstates_text(c, state, bill_no, t))]
