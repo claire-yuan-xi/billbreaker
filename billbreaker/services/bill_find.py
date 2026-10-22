@@ -43,6 +43,10 @@ GOVINFO_URL = re.compile(r"BILLS-(\d{2,3})([a-z]+?)(\d+)(?:[a-z]{2,4})\b", re.I)
 LEGISCAN_URL = re.compile(r"legiscan\.com/([A-Z]{2})/(?:bill|text|votes|research)/([A-Z]+)(\d+)/(\d{4})", re.I)
 OPENSTATES_URL = re.compile(r"openstates\.org/([a-z]{2})/bills/[^/]+/([A-Z]+)(\d+)", re.I)
 WORD = re.compile(r"[a-z0-9]+")
+WIKI = "https://en.wikipedia.org/w/api.php"
+WIKI_UA = "BillBreaker/1.0 (https://billbreaker.org)"
+# The bill an act's Wikipedia infobox names: {{USBill|117|H.R.|5376}}.
+USBILL = re.compile(r"\{\{\s*USBill\s*\|\s*(\d{1,3})\s*\|\s*([A-Za-z.\s]+?)\s*\|\s*(\d+)", re.I)
 SHORT_TITLE = re.compile(r"may be cited as the\s+[`'\"\u201c\u2018]+\s*([^`'\"\u201d\u2019]{3,200})", re.I)
 COMMON = {"the", "act", "of", "a", "an", "and", "for", "to", "in", "on", "bill", "law", "new", "state"}
 
@@ -213,6 +217,33 @@ async def _federal_web(client: httpx.AsyncClient, query: Query, timeout: float) 
     return []
 
 
+async def _wiki(client: httpx.AsyncClient, params: dict, timeout: float) -> dict:
+    try:
+        res = await client.get(WIKI, params={**params, "format": "json", "formatversion": "2"}, timeout=timeout,
+                               headers={"User-Agent": WIKI_UA})
+        return res.json() if res.status_code == 200 else {}
+    except (httpx.HTTPError, ValueError):
+        return {}
+
+
+async def _wiki_bill(client: httpx.AsyncClient, title: str, timeout: float) -> tuple[int, str, str] | None:
+    """(congress, prefix, number) from the infobox of an act's Wikipedia article."""
+    data = await _wiki(client, {"action": "parse", "page": title, "prop": "wikitext", "section": "0", "redirects": "1"}, timeout)
+    m = USBILL.search((data.get("parse") or {}).get("wikitext") or "")
+    prefix = m and re.sub(r"[.\s]", "", m.group(2)).upper()
+    return (int(m.group(1)), prefix, m.group(3)) if m and prefix in GOVINFO_TYPES else None
+
+
+async def _federal_wiki(client: httpx.AsyncClient, query: Query, timeout: float) -> list[Match]:
+    """Well-known acts by name, from Wikipedia, kept when GovInfo has the bill's text."""
+    data = await _wiki(client, {"action": "query", "list": "search", "srsearch": query.words, "srlimit": "4"}, timeout)
+    titles = [r["title"] for r in (data.get("query") or {}).get("search") or [] if _fits(query.words, r.get("title", ""))]
+    bills = await asyncio.gather(*(_wiki_bill(client, t, timeout) for t in titles[:2]))
+    pairs = [(t, b) for t, b in zip(titles, bills) if b and (not query.congress or b[0] == query.congress)]
+    have = await asyncio.gather(*(on_govinfo(client, *b, timeout) for _t, b in pairs))
+    return _unique([Match("US", federal_bill(*b), t) for (t, b), ok in zip(pairs, have) if ok])
+
+
 async def _openstates(client: httpx.AsyncClient, params: list[tuple[str, str]], timeout: float) -> list[dict] | None:
     """Open States bills for a search, or None when it cannot be asked."""
     key = settings.openstates_api_key
@@ -344,12 +375,15 @@ async def resolve(state: str, raw: str, use_ai: bool = True, timeout: float = 6)
         if query.bill_no:
             return await _typed_state(client, query, timeout)
         if query.state == "US" and query.words:
-            matches = await _federal_web(client, query, timeout)
-            # Bills that amend an act share its name, so unless the name matched exactly, Gemini
-            # names the act itself, and the closest checked name wins.
-            if use_ai and not (matches and _closeness(query.words, matches[0].title) == 1):
-                matches = _unique(matches + await _guess(client, query, timeout))
-                matches.sort(key=lambda m: -_closeness(query.words, m.title))
+            # Wikipedia knows the famous acts; bills that only amend one share its name, so each
+            # next source runs until a name matches exactly, and the closest checked name wins.
+            sources = [_federal_wiki, _federal_web] + ([_guess] if use_ai else [])
+            matches: list[Match] = []
+            for find in sources:
+                if any(_closeness(query.words, m.title) == 1 for m in matches):
+                    break
+                matches = _unique(matches + await find(client, query, timeout))
+            matches.sort(key=lambda m: -_closeness(query.words, m.title))
             return Found(query, matches[0], matches[1:MAX_MATCHES]) if matches else Found(query)
         if query.state == "US":
             finders = [_federal_number]

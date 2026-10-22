@@ -198,3 +198,18 @@ def test_gemini_names_the_act_when_the_web_only_finds_bills_about_it(web, monkey
     found = asyncio.run(resolve("US", "Inflation Reduction Act"))
     assert found.best.bill_no == "HR 5376 (117th)"
     assert [m.bill_no for m in found.others] == ["HR 300"]
+
+
+def test_a_famous_act_is_found_from_wikipedia(web):
+    def wikipedia(request):
+        if request.url.params.get("list") == "search":
+            return httpx.Response(200, json={"query": {"search": [{"title": "Inflation Reduction Act"}, {"title": "Inflation"}]}})
+        assert request.url.params.get("page") == "Inflation Reduction Act"
+        box = "{{Infobox U.S. legislation\n| introducedin = House\n| introducedbill = {{USBill|117|H.R.|5376}}\n}}"
+        return httpx.Response(200, json={"parse": {"wikitext": box}})
+
+    web["wikipedia.org"] = wikipedia
+    web[govinfo(117, "hr", 5376)] = printed(117, "hr", 5376)
+    web["/content/pkg/"] = bill_text("Inflation Reduction Act of 2022")
+    found = asyncio.run(resolve("US", "inflation reduction act", use_ai=False))
+    assert found.best == Match("US", "HR 5376 (117th)", "Inflation Reduction Act")
