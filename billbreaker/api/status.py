@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 from ..config import settings
 from ..services import ai_client
 from ..services.ai_client import AIError
+from ..services import bill_find
 from ..services.bill_find import describe, resolve
 from ..services.bill_sources import openstates_links, fetch_bill_text, find_openstates_bill
 from ..services.documents import read_document
@@ -47,7 +48,7 @@ _cache: dict[str, tuple[float, dict]] = {}
 _running: dict[str, asyncio.Task] = {}
 
 
-CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve")
+CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve", "wiki")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -81,9 +82,21 @@ async def _resolve(state: str, queries: str) -> dict:
     return {"ok": all(r["found"] for r in results), "results": list(results)}
 
 
+async def _wiki(words: str) -> dict:
+    """What Wikipedia says for a name search: the articles and the bill each infobox names."""
+    async with httpx.AsyncClient(follow_redirects=True) as client:
+        data = await bill_find._wiki(client, {"action": "query", "list": "search", "srsearch": words, "srlimit": "4"}, 8)
+        titles = [r["title"] for r in (data.get("query") or {}).get("search") or []]
+        bills = [await bill_find._wiki_bill(client, t, 8) for t in titles[:2]]
+        have = [b and await bill_find.on_govinfo(client, *b, 8) for b in bills]
+    return {"ok": any(have), "titles": titles, "bills": bills, "on_govinfo": have}
+
+
 async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
     if kind == "resolve":
         return await _resolve(state, query or bill)
+    if kind == "wiki":
+        return await _wiki(query or "Inflation Reduction Act")
     if kind == "ai":
         return {"models": await ai_client.probe()}
     if kind == "foryou":

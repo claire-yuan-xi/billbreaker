@@ -47,6 +47,8 @@ WIKI = "https://en.wikipedia.org/w/api.php"
 WIKI_UA = "BillBreaker/1.0 (https://billbreaker.org)"
 # The bill an act's Wikipedia infobox names: {{USBill|117|H.R.|5376}}.
 USBILL = re.compile(r"\{\{\s*USBill\s*\|\s*(\d{1,3})\s*\|\s*([A-Za-z.\s]+?)\s*\|\s*(\d+)", re.I)
+INTRODUCED = re.compile(r"introducedbill\s*=\s*\[*\s*((?:H\.?\s?J\.?\s?Res|H\.?\s?R|S\.?\s?J\.?\s?Res|S)\.?)\s*(\d+)", re.I)
+CONGRESS_LINK = re.compile(r"(\d{2,3})(?:st|nd|rd|th) United States Congress")
 SHORT_TITLE = re.compile(r"may be cited as the\s+[`'\"\u201c\u2018]+\s*([^`'\"\u201d\u2019]{3,200})", re.I)
 COMMON = {"the", "act", "of", "a", "an", "and", "for", "to", "in", "on", "bill", "law", "new", "state"}
 
@@ -226,12 +228,22 @@ async def _wiki(client: httpx.AsyncClient, params: dict, timeout: float) -> dict
         return {}
 
 
+def wiki_bill(wikitext: str) -> tuple[int, str, str] | None:
+    """(congress, prefix, number) from an act's infobox: {{USBill|117|H.R.|5376}}, or the
+    introduced bill written out with the Congress named elsewhere in the box."""
+    if m := USBILL.search(wikitext):
+        congress, prefix, number = int(m.group(1)), m.group(2), m.group(3)
+    elif (m := INTRODUCED.search(wikitext)) and (c := CONGRESS_LINK.search(wikitext)):
+        congress, prefix, number = int(c.group(1)), m.group(1), m.group(2)
+    else:
+        return None
+    prefix = re.sub(r"[.\s]", "", prefix).upper()
+    return (congress, prefix, number) if prefix in GOVINFO_TYPES else None
+
+
 async def _wiki_bill(client: httpx.AsyncClient, title: str, timeout: float) -> tuple[int, str, str] | None:
-    """(congress, prefix, number) from the infobox of an act's Wikipedia article."""
     data = await _wiki(client, {"action": "parse", "page": title, "prop": "wikitext", "section": "0", "redirects": "1"}, timeout)
-    m = USBILL.search((data.get("parse") or {}).get("wikitext") or "")
-    prefix = m and re.sub(r"[.\s]", "", m.group(2)).upper()
-    return (int(m.group(1)), prefix, m.group(3)) if m and prefix in GOVINFO_TYPES else None
+    return wiki_bill((data.get("parse") or {}).get("wikitext") or "")
 
 
 async def _federal_wiki(client: httpx.AsyncClient, query: Query, timeout: float) -> list[Match]:

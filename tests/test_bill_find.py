@@ -213,3 +213,11 @@ def test_a_famous_act_is_found_from_wikipedia(web):
     web["/content/pkg/"] = bill_text("Inflation Reduction Act of 2022")
     found = asyncio.run(resolve("US", "inflation reduction act", use_ai=False))
     assert found.best == Match("US", "HR 5376 (117th)", "Inflation Reduction Act")
+
+
+def test_reads_the_bill_from_an_infobox():
+    assert bill_find.wiki_bill("| introducedbill = {{USBill|117|H.R.|5376}}") == (117, "HR", "5376")
+    box = "| enacted by = [[119th United States Congress|119th]]\n| introducedbill = [[H.R. 1]]"
+    assert bill_find.wiki_bill(box) == (119, "HR", "1")
+    assert bill_find.wiki_bill("| introducedbill = {{USBill|118|H.J.Res.|7}}") == (118, "HJRES", "7")
+    assert bill_find.wiki_bill("no box") is None
