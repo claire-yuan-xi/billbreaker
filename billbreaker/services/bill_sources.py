@@ -1,6 +1,7 @@
 """
 Best-effort bill text fetcher with a fallback chain, each tier with its own timeout:
-Congress.gov then GovInfo for federal bills, OpenStates for state bills.
+Congress.gov then GovInfo for federal bills, OpenStates for state bills, then a
+web search for either.
 """
 
 import re
@@ -12,6 +13,7 @@ from urllib.parse import quote, urlparse
 import httpx
 
 from ..config import settings
+from .bill_web import fetch_web_text
 from .text import strip_html
 
 UA = "Mozilla/5.0 (compatible; BillBreaker/1.0)"
@@ -161,7 +163,7 @@ async def fetch_openstates_text(client: httpx.AsyncClient, state: str, bill_no: 
     return (text, source_url) if len(text) >= MIN_CHARS else None
 
 
-async def fetch_bill_text(state: str, bill_no: str, budget: float = 15, tier_timeout: float = 6) -> FetchResult:
+async def fetch_bill_text(state: str, bill_no: str, budget: float = 25, tier_timeout: float = 6) -> FetchResult:
     """Returns the first source with enough text, plus every source tried."""
     result = FetchResult()
     start = time.monotonic()
@@ -176,6 +178,7 @@ async def fetch_bill_text(state: str, bill_no: str, budget: float = 15, tier_tim
         ]
     else:
         tiers = [("openstates", lambda c, t: fetch_openstates_text(c, state, bill_no, t))]
+    tiers.append(("web", lambda c, t: fetch_web_text(c, state, bill_no, t)))
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         for name, run in tiers:

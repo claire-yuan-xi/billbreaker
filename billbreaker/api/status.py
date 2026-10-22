@@ -8,6 +8,7 @@ import logging
 import os
 import time
 
+import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
@@ -16,9 +17,11 @@ from ..config import settings
 from ..services import ai_client
 from ..services.ai_client import AIError
 from ..services.bill_sources import fetch_bill_text
+from ..services.bill_web import query_for
 from ..services.explain import breakdown
 from ..services.rate_limit import bump, client_ip
 from ..services.research import research_breakdown
+from ..services.web_search import search
 from ..states import STATE_NAMES
 from ..validation import normalize_bill_no
 
@@ -33,7 +36,7 @@ TTL = 120
 _cache: dict[str, tuple[float, dict]] = {}
 
 
-CHECKS = ("ai", "breakdown", "research", "fetch", "bill", "wait", "waited")
+CHECKS = ("ai", "breakdown", "research", "fetch", "search", "bill", "wait", "waited")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -86,7 +89,19 @@ async def _run(kind: str, state: str, bill: str, seconds: int) -> dict:
         return _summary(*await breakdown(SAMPLE, "Sample bill"))
     if kind == "fetch":
         fetched = await fetch_bill_text(state, bill)
-        return {"ok": bool(fetched.text), "source": fetched.source, "chars": len(fetched.text or ""), "tried": fetched.tried}
+        text = fetched.text or ""
+        return {
+            "ok": bool(text),
+            "source": fetched.source,
+            "url": fetched.source_url,
+            "chars": len(text),
+            "start": text[:300],
+            "tried": fetched.tried,
+        }
+    if kind == "search":
+        async with httpx.AsyncClient(follow_redirects=True) as client:
+            engine, results = await search(client, query_for(state, bill))
+        return {"ok": bool(results), "engine": engine, "results": [r["url"] for r in results[:8]]}
     if kind == "bill":
         return await _bill(state, bill)
     found = await research_breakdown(STATE_NAMES.get(state, state), bill, f"{state} {bill}")
