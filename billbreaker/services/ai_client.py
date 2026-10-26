@@ -21,6 +21,7 @@ OPENAI_URL = "https://generativelanguage.googleapis.com/v1beta/openai/chat/compl
 NATIVE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
 TRY_NEXT_MODEL = {404, 429, 500, 503}
 MAX_WAIT = 20
+FIRST_TRY_S = 30
 _transport: httpx.AsyncBaseTransport | None = None  # tests swap in a fake Gemini
 
 Send = Callable[[httpx.AsyncClient, str], Awaitable[httpx.Response]]
@@ -99,8 +100,14 @@ async def _run(send: Send, light: bool = False) -> tuple[httpx.Response, str]:
     names = models()[::-1] if light else models()
     async with httpx.AsyncClient(timeout=120, transport=_transport) as client:
         for i, model in enumerate(names):
-            res = await send(client, model)
-            if res.status_code in TRY_NEXT_MODEL and i < len(names) - 1:
+            last = i == len(names) - 1
+            try:
+                # A busy model can accept the request and then take minutes; the next one gets a turn.
+                res = await asyncio.wait_for(send(client, model), None if last else FIRST_TRY_S)
+            except TimeoutError:
+                log.warning("Gemini %s gave no answer in %ss, trying the next model", model, FIRST_TRY_S)
+                continue
+            if res.status_code in TRY_NEXT_MODEL and not last:
                 log.warning("Gemini %s on %s: %s", res.status_code, model, error_message(res.text))
                 continue
             wait = _retry_after(res.text) if res.status_code == 429 else None

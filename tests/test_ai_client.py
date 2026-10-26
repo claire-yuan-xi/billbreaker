@@ -65,7 +65,7 @@ def test_breakdown_is_one_call_with_every_section(monkeypatch, set_setting):
     }
     seen = gemini(monkeypatch, set_setting, lambda req, n: reply(data))
     title, sections = asyncio.run(explain.breakdown("bill text", "US HR1"))
-    assert seen == ["main-model"]
+    assert seen == ["lite-model"]
     assert title == "A plain title"
     assert [s["event"] for s in sections] == ["quick_take", "status_quo_diff", "winners_losers", "supporters_vs_critics", "citations"]
 
@@ -116,3 +116,18 @@ def test_a_light_call_starts_with_the_fallback_model(monkeypatch, set_setting):
     seen = gemini(monkeypatch, set_setting, lambda req, n: reply({"ok": 3}))
     assert asyncio.run(ai_client.call_ai("s", "u", SCHEMA, light=True)) == {"ok": 3}
     assert seen == ["lite-model"]
+
+
+def test_a_model_that_hangs_gives_the_next_one_a_turn(monkeypatch, set_setting):
+    set_setting("gemini_api_key", "test-key")
+    set_setting("gemini_model", "main-model")
+    set_setting("gemini_fallback_model", "lite-model")
+    monkeypatch.setattr(ai_client, "FIRST_TRY_S", 0.05)
+
+    async def handler(request):
+        if json.loads(request.content)["model"] == "main-model":
+            await asyncio.sleep(1)
+        return reply({"ok": 1})
+
+    monkeypatch.setattr(ai_client, "_transport", httpx.MockTransport(handler))
+    assert asyncio.run(ai_client.call_ai("s", "u", SCHEMA)) == {"ok": 1}

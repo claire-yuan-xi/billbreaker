@@ -16,7 +16,7 @@ from fastapi.responses import JSONResponse
 from ..config import settings
 from ..services import ai_client
 from ..services.ai_client import AIError
-from ..services import bill_find
+from ..services import bill_find, visits
 from ..services.bill_find import describe, resolve
 from ..services.bill_sources import openstates_links, fetch_bill_text, find_openstates_bill
 from ..services.documents import read_document
@@ -172,6 +172,10 @@ async def status(
         },
         "models": ai_client.models(),
     }
+    try:
+        out["visits"] = await visits.total()
+    except Exception as exc:  # noqa: BLE001 - the rest of the page still helps
+        out["visits"] = f"unavailable: {type(exc).__name__}"
     if check not in CHECKS:
         return out
     bill = normalize_bill_no(bill) or "AB 5"

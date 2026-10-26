@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from .ml import notebook_run as run
 from .ml.claims_check import FLAG_LABELS, SERIOUS, check_claims, serious_count
 from .ml.profile_terms import clean_profile, profile_terms
-from .services import shares
+from .services import shares, visits
 from .services.render import render_share
 from .templating import templates
 from .validation import SLUG
@@ -16,16 +16,19 @@ router = APIRouter()
 
 @router.get("/", response_class=HTMLResponse)
 async def index(request: Request):
+    await visits.count()
     return templates.TemplateResponse(request, "index.html")
 
 
 @router.get("/bill", response_class=HTMLResponse)
 async def bill(request: Request, state: str = "US", number: str = ""):
+    await visits.count()
     return templates.TemplateResponse(request, "bill.html", {"state": state, "number": number})
 
 
 @router.get("/b/{slug}", response_class=HTMLResponse)
 async def shared(request: Request, slug: str):
+    await visits.count()
     row = await shares.get(slug) if SLUG.match(slug) else None
     if not row:
         return templates.TemplateResponse(request, "share_missing.html", status_code=404)

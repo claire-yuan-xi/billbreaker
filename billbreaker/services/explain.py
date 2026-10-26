@@ -61,7 +61,8 @@ def _wrap(bill: str, identifier: str, instruction: str) -> str:
 
 async def breakdown(bill: str, identifier: str) -> tuple[str, list[dict]]:
     """Returns the title and the sections in reading order, as {event, data}."""
-    data = await call_ai(BASE_SYSTEM, _wrap(bill, identifier, INSTRUCTION), BREAKDOWN)
+    # The lighter model answers in seconds where the main one is often busy or slow on the free tier.
+    data = await call_ai(BASE_SYSTEM, _wrap(bill, identifier, INSTRUCTION), BREAKDOWN, light=True)
     title = data.get("title")
     title = title.strip()[:160] if isinstance(title, str) and title.strip() else identifier
     sections = [{"event": e, "data": data[e]} for e in ORDER if isinstance(data.get(e), dict)]

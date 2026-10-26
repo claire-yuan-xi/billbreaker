@@ -50,6 +50,10 @@ CREATE TABLE IF NOT EXISTS abuse_events (
   window_seconds INTEGER NOT NULL,
   meta TEXT
 );
+CREATE TABLE IF NOT EXISTS counters (
+  name TEXT PRIMARY KEY,
+  value INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS device_watchlist (
   device_id TEXT NOT NULL,
   state TEXT NOT NULL,

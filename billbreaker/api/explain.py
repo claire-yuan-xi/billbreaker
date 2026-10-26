@@ -224,7 +224,8 @@ async def explain_bill(request: Request):
             old = await stale(code)
             if old:
                 payload, flags = old
-                return JSONResponse(_flat(payload, **flags, **source_meta), headers={"Cache-Control": "no-store"})
+                mine = await for_you(payload.get("title") or identifier, payload.get("sections", []))
+                return JSONResponse(_flat(payload, mine, **flags, **source_meta), headers={"Cache-Control": "no-store"})
             return JSONResponse({"error": _friendly(code)}, status_code=503)
         await _save_quietly(state, cache_bill, text_hash, title, source_url, sections)
         payload = {"title": title, "sourceUrl": source_url, "sections": sections}
@@ -245,6 +246,8 @@ async def explain_bill(request: Request):
                 yield sse("meta", {"title": payload.get("title"), "sourceUrl": payload.get("sourceUrl"), **flags, **source_meta})
                 for s in payload.get("sections", []):
                     yield section_event(s["event"], s["data"])
+                async for event in for_you_events(payload.get("title") or identifier, payload.get("sections", [])):
+                    yield event
                 yield sse("done", {"cached": True})
                 return
             retry = {} if code in NO_RETRY else {"fallback": "json"}

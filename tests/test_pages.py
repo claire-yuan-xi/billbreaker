@@ -70,3 +70,9 @@ def test_ml_generate_personalizes_the_browser_summary(client, monkeypatch):
 def test_csp_allows_the_browser_model(client):
     csp = client.get("/admin/ml").headers["content-security-policy"]
     assert "'wasm-unsafe-eval'" in csp and "https://huggingface.co" in csp
+
+
+def test_every_page_load_counts_as_a_visit(client):
+    for path in ("/", "/bill?state=TX&number=HB%201", "/"):
+        client.get(path)
+    assert client.get("/api/status").json()["visits"] == 3
