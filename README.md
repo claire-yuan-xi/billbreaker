@@ -1,8 +1,6 @@
 # Bill Breaker
 
-Plain-language explanations of US federal and state bills, with live AP
-legislation headlines, saved bills, share links and an admin view of the
-fine-tuned model.
+BillBreaker is a web app that translates dense legislative text into plain English for teens and young voters, with a personalized breakdown of how each bill would affect them.
 
 ## Stack
 
@@ -13,28 +11,9 @@ fine-tuned model.
 - Browser: small JavaScript modules for animation (GSAP, Lenis) and the
   interactive bits (`billbreaker/static/js/`), styled with Tailwind
 
-## Run it
+## Use it
 
-```sh
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements-dev.txt
-cp .env.example .env        # add GEMINI_API_KEY, and OPENSTATES_API_KEY for state bills
-uvicorn billbreaker.main:app --reload --port 3000
-```
-
-Open http://localhost:3000.
-
-## Common tasks
-
-| Task                   | Command                                   |
-| ---------------------- | ----------------------------------------- |
-| Run the tests          | `pytest`                                  |
-| Rebuild the CSS        | `scripts/build-css.sh` (add `--watch`)    |
-| Open the notebooks     | `jupyter lab notebooks`                   |
-| Regenerate depth map   | `python3 scripts/make-depth-map.py ...`   |
-
-`billbreaker/static/css/app.css` is committed, so the CSS only needs a rebuild
-after changing classes in templates or JS.
+billbreaker.org
 
 ## Layout
 
@@ -62,4 +41,4 @@ docs/               deploying to Vercel, abuse monitoring
 
 ## Hosting
 
-Vercel (free) with a free Turso database; steps in [docs/deploy-vercel.md](docs/deploy-vercel.md).
+Vercel in the free plan; bought a domain
