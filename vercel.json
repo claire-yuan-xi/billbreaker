@@ -5,5 +5,11 @@
     "billbreaker/main.py": {
       "maxDuration": 300
     }
-  }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/prewarm",
+      "schedule": "0 9 * * *"
+    }
+  ]
 }

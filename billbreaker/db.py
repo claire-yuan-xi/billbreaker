@@ -54,6 +54,13 @@ CREATE TABLE IF NOT EXISTS counters (
   name TEXT PRIMARY KEY,
   value INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS bill_views (
+  state TEXT NOT NULL,
+  bill_no TEXT NOT NULL,
+  views INTEGER NOT NULL,
+  last_viewed TEXT NOT NULL,
+  PRIMARY KEY (state, bill_no)
+);
 CREATE TABLE IF NOT EXISTS device_watchlist (
   device_id TEXT NOT NULL,
   state TEXT NOT NULL,

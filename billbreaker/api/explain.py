@@ -7,7 +7,7 @@ import re
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 
-from ..services import analysis_cache
+from ..services import analysis_cache, bill_views
 from ..services.ai_client import AIError
 from ..services.bill_find import resolve
 from ..services.bill_query import parse_query
@@ -154,6 +154,9 @@ async def explain_bill(request: Request):
         mine = await for_you(title, sections)
         if mine:
             yield section_event("for_you", mine)
+
+    if bill_no:
+        await bill_views.count(state, bill_no)
 
     # 1) Cache hit: free to anyone, no rate limit.
     try:
