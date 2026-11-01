@@ -16,3 +16,10 @@ def test_a_gemini_failure_shows_google_s_message(client, monkeypatch):
     out = client.get("/api/status?check=research&state=TX&bill=HB 1").json()["research"]
     assert out["error"] == "RATE_LIMIT"
     assert out["detail"] == "lite-model 429: quota exceeded"
+
+
+def test_the_db_check_dates_the_data_without_showing_the_address(client):
+    client.get("/")
+    body = client.get("/api/status?check=db").json()["db"]
+    assert body["backend"] == "local" and body["counters"] == {"visits": 1}
+    assert set(body["tables"]) >= {"bill_analyses", "shared_analyses", "abuse_events"}

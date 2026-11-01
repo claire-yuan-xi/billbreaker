@@ -4,19 +4,21 @@ site can be read from a browser. Never shows a key, only whether one is set.
 """
 
 import asyncio
+import hashlib
 import logging
 import os
 import re
 import time
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
+from .. import db
 from ..config import settings
-from ..services import ai_client
+from ..services import ai_client, bill_find, visits
 from ..services.ai_client import AIError
-from ..services import bill_find, visits
 from ..services.bill_find import describe, resolve
 from ..services.bill_sources import openstates_links, fetch_bill_text, find_openstates_bill
 from ..services.documents import read_document
@@ -48,7 +50,7 @@ _cache: dict[str, tuple[float, dict]] = {}
 _running: dict[str, asyncio.Task] = {}
 
 
-CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve", "wiki")
+CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve", "wiki", "db")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -95,7 +97,36 @@ async def _wiki(words: str) -> dict:
     return {"ok": any(have), "titles": titles, "bills": bills, "on_govinfo": have, "first_box": lines}
 
 
+# Each table and the column that dates its rows, to tell a reset database from an old one.
+DB_TABLES = {
+    "bill_analyses": "created_at",
+    "shared_analyses": "created_at",
+    "abuse_events": "ts",
+    "device_watchlist": "added_at",
+    "bill_views": "last_viewed",
+}
+
+
+async def _db() -> dict:
+    """Which database the site writes to (a fingerprint, never the address) and how old its data is."""
+    host = urlparse(settings.turso_url.replace("libsql://", "https://", 1)).hostname or ""
+    tables = {}
+    for table, column in DB_TABLES.items():
+        row = await db.query_one(f"SELECT COUNT(*) AS n, MIN({column}) AS oldest FROM {table}")
+        tables[table] = row
+    counters = await db.query("SELECT name, value FROM counters")
+    return {
+        "ok": True,
+        "backend": "turso" if host else "local",
+        "fingerprint": hashlib.sha256(host.encode()).hexdigest()[:10] if host else None,
+        "tables": tables,
+        "counters": {r["name"]: r["value"] for r in counters},
+    }
+
+
 async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
+    if kind == "db":
+        return await _db()
     if kind == "resolve":
         return await _resolve(state, query or bill)
     if kind == "wiki":
