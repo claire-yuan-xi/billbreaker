@@ -12,7 +12,7 @@ CSP = {
     "worker-src": ["'self'", "blob:"],
     "object-src": ["'none'"],
     "base-uri": ["'self'"],
-    "form-action": ["'self'"],
+    "form-action": ["'self'", "https://checkout.stripe.com"],
     "frame-ancestors": ["'self'"],
 }
 

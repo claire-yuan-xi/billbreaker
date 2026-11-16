@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from .ml import notebook_run as run
 from .ml.claims_check import FLAG_LABELS, SERIOUS, check_claims, serious_count
 from .ml.profile_terms import clean_profile, profile_terms
-from .services import shares, visits
+from .services import donate, shares, visits
 from .services.render import render_share
 from .templating import templates
 from .validation import SLUG
@@ -34,6 +34,12 @@ async def shared(request: Request, slug: str):
         return templates.TemplateResponse(request, "share_missing.html", status_code=404)
     context = {"row": row, "sections": render_share(row["payload"])}
     return templates.TemplateResponse(request, "share.html", context)
+
+
+@router.get("/donate", response_class=HTMLResponse)
+async def donate_page(request: Request, thanks: str = "", error: str = ""):
+    context = {"amounts": donate.AMOUNTS, "thanks": bool(thanks), "error": error, "open": donate.enabled()}
+    return templates.TemplateResponse(request, "donate.html", context)
 
 
 @router.get("/admin/ml", response_class=HTMLResponse)

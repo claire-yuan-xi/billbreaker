@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Donate | BillBreaker{% endblock %}
+{% block description %}Keep BillBreaker free.{% endblock %}
+{% block body %}
+<main class="min-h-screen bg-background text-foreground">
+  <header class="border-b border-border">
+    <div class="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
+      <a href="/" class="flex items-center gap-2 text-sm font-medium tracking-tight">
+        <span class="inline-block h-2 w-2 bg-foreground"></span>
+        <span>bill_breaker</span>
+      </a>
+      <a href="/" class="text-sm text-foreground/80 underline-offset-4 hover:underline">Home</a>
+    </div>
+  </header>
+  <div class="mx-auto flex max-w-6xl justify-center px-6 py-24">
+    {% if thanks %}
+      {% include "donate/thanks.html" %}
+    {% else %}
+      {% include "donate/form.html" %}
+    {% endif %}
+  </div>
+</main>
+{% endblock %}
+{% block scripts %}
+<script type="module" src="{{ url_for('static', path='js/pages/donate.js') }}"></script>
+{% endblock %}

@@ -1,0 +1,22 @@
+{# Small card: four amounts and one button. Stripe Checkout offers Apple Pay, Google Pay and card. #}
+<form data-donate method="post" action="/donate" class="w-full max-w-sm border border-border p-6">
+  <h1 class="font-serif text-3xl font-bold tracking-tight">Support BillBreaker</h1>
+  <fieldset class="mt-6">
+    <legend class="sr-only">Amount</legend>
+    <div class="grid grid-cols-4 gap-2">
+      {% for amount in amounts %}
+      <label class="cursor-pointer">
+        <input type="radio" name="amount" value="{{ amount }}" class="peer sr-only" {% if amount == 5 %}checked{% endif %} />
+        <span class="block border border-border py-3 text-center text-base font-medium transition-colors hover:border-foreground peer-checked:border-foreground peer-checked:bg-foreground peer-checked:text-background peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2">${{ amount }}</span>
+      </label>
+      {% endfor %}
+    </div>
+  </fieldset>
+  <button type="submit" data-press data-donate-submit {% if not open %}disabled{% endif %} class="relative mt-4 w-full overflow-hidden bg-foreground py-3 text-base font-semibold text-background disabled:cursor-not-allowed disabled:opacity-40">Donate $5</button>
+  <p class="mt-3 text-center text-sm text-foreground/70">Apple Pay or card</p>
+  {% if not open %}
+  <p class="mt-3 text-center text-sm text-foreground/70">Opening soon</p>
+  {% elif error %}
+  <p role="alert" class="mt-3 text-center text-sm text-destructive">{% if error == "busy" %}Too many tries, wait a bit{% else %}Payment page did not open, try again{% endif %}</p>
+  {% endif %}
+</form>
