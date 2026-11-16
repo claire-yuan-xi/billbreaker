@@ -15,6 +15,8 @@ from .documents import read_document
 # "| cite statutes at large = {{usstat|78|241}}" or "78 Stat. 241".
 CITE_LINE = re.compile(r"statutes[ _]at[ _]large\s*=([^\n]*)", re.I)
 USSTAT = re.compile(r"\{\{\s*usstat\s*\|\s*(\d{1,3})\s*\|\s*(\d{1,5})", re.I)
+# {{USStatute|congress|law|volume|page|year|month|day}}
+USSTATUTE = re.compile(r"\{\{\s*usstatute\s*\|\s*\d+\s*\|\s*\d+\s*\|\s*(\d{1,3})\s*\|\s*(\d{1,5})", re.I)
 PLAIN = re.compile(r"\b(\d{1,3})\s*Stat\.?\s*(\d{1,5})\b")
 MIN_CHARS = 400
 # Scanned volumes are large: the ADA's pages are well over the usual 8 MB limit.
@@ -27,7 +29,7 @@ def statute_cite(wikitext: str) -> tuple[int, int] | None:
     if not line:
         return None
     value = re.sub(r"&nbsp;|\u00a0", " ", line.group(1))
-    m = USSTAT.search(value) or PLAIN.search(value)
+    m = USSTAT.search(value) or USSTATUTE.search(value) or PLAIN.search(value)
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 

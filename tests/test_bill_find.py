@@ -282,6 +282,7 @@ def test_reads_a_statute_citation_and_skips_margin_notes():
 
     assert statute_cite("| cite statutes at large = {{usstat|78|241}}") == (78, 241)
     assert statute_cite("| cite statutes at large = 104 Stat. 327") == (104, 327)
+    assert statute_cite("| cite statutes at large = {{USStatute|74|271|49|620|1935|08|14}}") == (49, 620)
     assert statute_cite("| introducedbill = H.R. 1") is None
     text = "This Act may be cited <<NOTE: 26 USC 1 note.>> as the ``Inflation Reduction Act of 2022''."
     assert bill_find.short_titles(text) == ["Inflation Reduction Act of 2022"]
