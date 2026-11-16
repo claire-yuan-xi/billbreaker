@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Stats | BillBreaker{% endblock %}
+{% block description %}Site visits and clicks.{% endblock %}
+{% block meta %}<meta name="robots" content="noindex,nofollow" />{% endblock %}
+{% block vendor %}{% endblock %}
+{% block body %}
+<main class="min-h-screen bg-background text-foreground">
+  <div class="mx-auto max-w-3xl px-6 py-16">
+    <h1 class="font-serif text-4xl font-bold tracking-tight">Stats</h1>
+    <div class="mt-10 grid gap-4 sm:grid-cols-2">
+      {% for name, label in (("visits", "Total visits"), ("clicks", "Total clicks")) %}
+      <section class="rounded-lg border border-border p-6">
+        <h2 class="text-lg font-medium">{{ label }}</h2>
+        <p class="mt-2 font-serif text-6xl font-bold tabular-nums">{{ "{:,}".format(totals[name]) }}</p>
+        <p class="mt-3 text-base text-foreground/80">Today {{ "{:,}".format(today.get(name, 0)) }}</p>
+      </section>
+      {% endfor %}
+    </div>
+    <h2 class="mt-12 text-xl font-medium">Last 14 days</h2>
+    <table class="mt-4 w-full text-left text-base">
+      <thead>
+        <tr class="border-b border-border">
+          <th class="py-2 font-medium">Day</th>
+          <th class="py-2 text-right font-medium">Visits</th>
+          <th class="py-2 text-right font-medium">Clicks</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in days %}
+        <tr class="border-b border-border/60">
+          <td class="py-2">{{ row.day }}</td>
+          <td class="py-2 text-right tabular-nums">{{ "{:,}".format(row.visits) }}</td>
+          <td class="py-2 text-right tabular-nums">{{ "{:,}".format(row.clicks) }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <p class="mt-8 text-base text-foreground/80">Visits include 173 counted before November 1. Daily counts and clicks start November 16.</p>
+  </div>
+</main>
+{% endblock %}
+{% block tracking %}{% endblock %}

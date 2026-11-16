@@ -6,7 +6,7 @@ from fastapi.responses import HTMLResponse
 from .ml import notebook_run as run
 from .ml.claims_check import FLAG_LABELS, SERIOUS, check_claims, serious_count
 from .ml.profile_terms import clean_profile, profile_terms
-from .services import donate, shares, visits
+from .services import donate, shares, stats, visits
 from .services.render import render_share
 from .templating import templates
 from .validation import SLUG
@@ -40,6 +40,11 @@ async def shared(request: Request, slug: str):
 async def donate_page(request: Request, thanks: str = "", error: str = ""):
     context = {"amounts": donate.AMOUNTS, "thanks": bool(thanks), "error": error, "open": donate.enabled()}
     return templates.TemplateResponse(request, "donate.html", context)
+
+
+@router.get("/stats", response_class=HTMLResponse)
+async def stats_page(request: Request):
+    return templates.TemplateResponse(request, "stats.html", await stats.summary())
 
 
 @router.get("/admin/ml", response_class=HTMLResponse)

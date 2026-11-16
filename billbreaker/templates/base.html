@@ -26,5 +26,6 @@
   <body class="{% block body_class %}{% endblock %}">
     {% block body %}{% endblock %}
     {% block scripts %}{% endblock %}
+    {% block tracking %}<script type="module" src="{{ url_for('static', path='js/lib/clicks.js') }}"></script>{% endblock %}
   </body>
 </html>

@@ -54,6 +54,12 @@ CREATE TABLE IF NOT EXISTS counters (
   name TEXT PRIMARY KEY,
   value INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS daily_counts (
+  day TEXT NOT NULL,
+  name TEXT NOT NULL,
+  value INTEGER NOT NULL,
+  PRIMARY KEY (day, name)
+);
 CREATE TABLE IF NOT EXISTS bill_views (
   state TEXT NOT NULL,
   bill_no TEXT NOT NULL,
