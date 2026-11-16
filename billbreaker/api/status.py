@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 
 from .. import db
 from ..config import settings
-from ..services import ai_client, bill_find, visits
+from ..services import ai_client, bill_find, new_bills, visits
 from ..services.ai_client import AIError
 from ..services.bill_find import describe, resolve
 from ..services.bill_sources import openstates_links, fetch_bill_text, find_openstates_bill
@@ -50,7 +50,7 @@ _cache: dict[str, tuple[float, dict]] = {}
 _running: dict[str, asyncio.Task] = {}
 
 
-CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve", "wiki", "db")
+CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve", "wiki", "db", "newbills")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -127,6 +127,15 @@ async def _db() -> dict:
 async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
     if kind == "db":
         return await _db()
+    if kind == "newbills":
+        feed, house = await new_bills.read_sources()
+        return {
+            "ok": bool(feed or house),
+            "printed": len(feed),
+            "printed_floor": [r["bill_no"] for r in feed if r["on_floor"]][:8],
+            "house_floor": house[:12],
+            "stored_floor": await new_bills.on_floor(12),
+        }
     if kind == "resolve":
         return await _resolve(state, query or bill)
     if kind == "wiki":

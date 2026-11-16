@@ -86,11 +86,17 @@ async def _get(client: httpx.AsyncClient, url: str, timeout: float) -> str:
         return ""
 
 
-async def refresh(timeout: float = 15) -> dict:
-    """Reads both sources and stores what they list; returns how many of each it saw."""
+async def read_sources(timeout: float = 15) -> tuple[list[dict], list[str]]:
+    """GovInfo's newest printed bills and the House floor schedule, read live."""
     async with httpx.AsyncClient(follow_redirects=True) as client:
         feed = parse_feed(await _get(client, BILLS_FEED, timeout))
         house = parse_house_floor(await _get(client, HOUSE_FLOOR, timeout))
+    return feed, house
+
+
+async def refresh(timeout: float = 15) -> dict:
+    """Reads both sources and stores what they list; returns how many of each it saw."""
+    feed, house = await read_sources(timeout)
     if not feed and not house:
         return {"printed": 0, "house_floor": 0}  # both sources down: keep yesterday's list
     # The newest version of each bill decides its row.
