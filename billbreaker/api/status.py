@@ -109,6 +109,7 @@ DB_TABLES = {
     "abuse_events": "ts",
     "device_watchlist": "added_at",
     "bill_views": "last_viewed",
+    "new_bills": "published",
 }
 
 
