@@ -127,6 +127,8 @@ async def _db() -> dict:
         "fingerprint": hashlib.sha256(host.encode()).hexdigest()[:10] if host else None,
         "tables": tables,
         "counters": {r["name"]: r["value"] for r in counters},
+        # Names only, never values: shows when a host integration sets its own database per deploy.
+        "env_names": sorted(k for k in os.environ if re.search(r"TURSO|LIBSQL|DATABASE|_DB_", k)),
     }
 
 
