@@ -45,6 +45,8 @@ SKIP = (
     "legiscan.com",
 )
 OFFICIAL_WORDS = re.compile(r"legis|senate|house|assembly|capitol|statehouse", re.I)
+# A roll call page names the bill but holds none of its text.
+VOTE_PAGE = re.compile(r"roll_?call|/votes?/|vote_\d", re.I)
 HREF = re.compile(r'href="([^"#]+)"', re.I)
 TEXT_LINK = re.compile(r"\.(?:htm|html|txt|pdf)$|billtext|/text", re.I)
 LONG_NAMES = {"HB": "House Bill", "SB": "Senate Bill", "AB": "Assembly Bill", "HR": "H.R.", "S": "S."}
@@ -128,7 +130,9 @@ async def fetch_web_text(client: httpx.AsyncClient, state: str, bill_no: str, ti
     results = await search(client, query_for(state, bill_no), timeout)
     # Only legislature sites and bill trackers: other pages that mention a bill
     # number are often about an older bill with the same number.
-    candidates = [r["url"] for r in results if _public(r["url"]) and _rank(r["url"]) >= 3]
+    candidates = [
+        r["url"] for r in results if _public(r["url"]) and _rank(r["url"]) >= 3 and not VOTE_PAGE.search(r["url"])
+    ]
     candidates = sorted(dict.fromkeys(candidates), key=_rank, reverse=True)[:MAX_PAGES]
     docs = await asyncio.gather(*(read_document(client, url, timeout) for url in candidates))
     kept = [d for d in docs if len(d.text) >= MIN_CHARS and pattern.search(d.text)][:KEEP_PAGES]

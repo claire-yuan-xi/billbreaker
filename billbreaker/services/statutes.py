@@ -24,7 +24,8 @@ def statute_cite(wikitext: str) -> tuple[int, int] | None:
     line = CITE_LINE.search(wikitext)
     if not line:
         return None
-    m = USSTAT.search(line.group(1)) or PLAIN.search(line.group(1))
+    value = re.sub(r"&nbsp;|\u00a0", " ", line.group(1))
+    m = USSTAT.search(value) or PLAIN.search(value)
     return (int(m.group(1)), int(m.group(2))) if m else None
 
 

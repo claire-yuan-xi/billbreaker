@@ -85,3 +85,10 @@ def test_private_addresses_are_never_fetched():
     assert not bill_web._public("http://localhost:3000/")
     assert not bill_web._public("file:///etc/passwd")
     assert bill_web._public("https://legiscan.com/TX/bill/HB1/2025")
+
+
+def test_a_roll_call_page_is_not_bill_text():
+    from billbreaker.services.bill_web import VOTE_PAGE
+
+    assert VOTE_PAGE.search("https://www.senate.gov/legislative/LIS/roll_call_votes/vote1011/vote_101_1_00173.htm")
+    assert not VOTE_PAGE.search("https://www.legislature.mi.gov/documents/2025-2026/billintroduced/Senate/htm/2025-SIB-1245.htm")
