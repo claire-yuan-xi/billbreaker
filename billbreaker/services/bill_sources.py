@@ -17,6 +17,7 @@ from ..config import settings
 from ..validation import ordinal, split_congress
 from .bill_web import OFFICIAL_WORDS, bill_pattern, fetch_web_text
 from .documents import read_document
+from .statutes import fetch_statute_text
 from .text import strip_html
 
 UA = "Mozilla/5.0 (compatible; BillBreaker/1.0)"
@@ -223,6 +224,8 @@ async def fetch_bill_text(state: str, bill_no: str, budget: float = 25, tier_tim
     if state == "US":
         tiers = [
             ("govinfo", lambda c, t: fetch_govinfo_text(c, bill_no, t)),
+            # Laws from before 1993 come from GovInfo too, as printed in the Statutes at Large.
+            ("govinfo", lambda c, t: fetch_statute_text(c, bill_no, t)),
             ("congress.gov", lambda c, t: fetch_congress_text(c, bill_no, t)),
         ]
     else:

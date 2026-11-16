@@ -74,6 +74,10 @@ CREATE TABLE IF NOT EXISTS new_bills (
   published TEXT NOT NULL,
   on_floor INTEGER NOT NULL DEFAULT 0
 );
+CREATE TABLE IF NOT EXISTS statute_links (
+  bill_no TEXT PRIMARY KEY,
+  url TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS device_watchlist (
   device_id TEXT NOT NULL,
   state TEXT NOT NULL,

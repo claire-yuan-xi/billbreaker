@@ -21,9 +21,10 @@ from .ai_schemas import BILL_GUESS
 from .bill_query import FEDERAL, Query, parse_query
 from .bill_sources import CONGRESS_CHAMBERS, GOVINFO_TYPES, UA, congresses, current_congress, find_openstates_bill
 from .bill_sources import openstates_jurisdiction
-from . import new_bills
+from . import new_bills, statutes
 from .govinfo import read_head
 from .public_law import law_bill
+from .statutes import statute_cite
 from .web_search import search
 
 log = logging.getLogger(__name__)
@@ -127,6 +128,8 @@ async def on_govinfo(client: httpx.AsyncClient, congress: int, prefix: str, numb
 
 def short_titles(text: str) -> list[str]:
     """What "This Act may be cited as" names, the way a bill states its own name."""
+    # Printed laws put margin notes mid-sentence: "may be cited <<NOTE: ...>> as the".
+    text = re.sub(r"\s*<<\s*NOTE:[^>]*>>\s*", " ", text)
     return [m.strip() for m in SHORT_TITLE.findall(text)]
 
 
@@ -247,19 +250,39 @@ def wiki_bill(wikitext: str) -> tuple[int, str, str] | None:
     return (congress, prefix, number) if prefix in GOVINFO_TYPES else None
 
 
-async def _wiki_bill(client: httpx.AsyncClient, title: str, timeout: float) -> tuple[int, str, str] | None:
+async def _wiki_box(client: httpx.AsyncClient, title: str, timeout: float) -> str:
     data = await _wiki(client, {"action": "parse", "page": title, "prop": "wikitext", "section": "0", "redirects": "1"}, timeout)
-    return wiki_bill((data.get("parse") or {}).get("wikitext") or "")
+    return (data.get("parse") or {}).get("wikitext") or ""
+
+
+async def _wiki_bill(client: httpx.AsyncClient, title: str, timeout: float) -> tuple[int, str, str] | None:
+    return wiki_bill(await _wiki_box(client, title, timeout))
+
+
+async def _has_text(client: httpx.AsyncClient, bill: tuple[int, str, str], box: str, timeout: float) -> bool:
+    """GovInfo has the bill, or, for a law older than its bill collection, the law as printed."""
+    if await on_govinfo(client, *bill, timeout):
+        return True
+    cite = statute_cite(box)
+    if not cite:
+        return False
+    try:
+        await statutes.remember(federal_bill(*bill), *cite)
+    except Exception as exc:  # noqa: BLE001 - without the link the bill simply has no text
+        log.warning("statute link not saved: %s", type(exc).__name__)
+        return False
+    return True
 
 
 async def _federal_wiki(client: httpx.AsyncClient, query: Query, timeout: float) -> list[Match]:
     """Well-known acts by name, from Wikipedia, kept when GovInfo has the bill's text."""
     data = await _wiki(client, {"action": "query", "list": "search", "srsearch": query.words, "srlimit": "4"}, timeout)
     titles = [r["title"] for r in (data.get("query") or {}).get("search") or [] if _fits(query.words, r.get("title", ""))]
-    bills = await asyncio.gather(*(_wiki_bill(client, t, timeout) for t in titles[:2]))
-    pairs = [(t, b) for t, b in zip(titles, bills) if b and (not query.congress or b[0] == query.congress)]
-    have = await asyncio.gather(*(on_govinfo(client, *b, timeout) for _t, b in pairs))
-    return _unique([Match("US", federal_bill(*b), t) for (t, b), ok in zip(pairs, have) if ok])
+    boxes = await asyncio.gather(*(_wiki_box(client, t, timeout) for t in titles[:2]))
+    found = [(t, wiki_bill(box), box) for t, box in zip(titles, boxes)]
+    found = [(t, b, box) for t, b, box in found if b and (not query.congress or b[0] == query.congress)]
+    have = await asyncio.gather(*(_has_text(client, b, box, timeout) for _t, b, box in found))
+    return _unique([Match("US", federal_bill(*b), t) for (t, b, _box), ok in zip(found, have) if ok])
 
 
 async def _openstates(client: httpx.AsyncClient, params: list[tuple[str, str]], timeout: float) -> list[dict] | None:

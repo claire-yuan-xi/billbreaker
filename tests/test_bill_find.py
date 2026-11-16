@@ -250,3 +250,38 @@ def test_a_new_bill_is_found_by_name_from_the_daily_list(web):
     ))
     found = asyncio.run(resolve("US", "Abuse of the Pardon Prevention Act", use_ai=False))
     assert found.best == Match("US", "HR 11003", "Abuse of the Pardon Prevention Act of 2026")
+
+
+def test_an_old_law_is_found_and_read_from_the_statutes_at_large(web):
+    from billbreaker.services import statutes
+    from billbreaker.services.bill_sources import fetch_bill_text
+
+    def wikipedia(request):
+        if request.url.params.get("list") == "search":
+            return httpx.Response(200, json={"query": {"search": [{"title": "Civil Rights Act of 1964"}]}})
+        box = (
+            "{{Infobox U.S. legislation\n| enacted by = 88th\n| introducedbill = H.R. 7152\n"
+            "| cite statutes at large = {{usstat|78|241}}\n}}"
+        )
+        return httpx.Response(200, json={"parse": {"wikitext": box}})
+
+    web["wikipedia.org"] = wikipedia
+    web["govinfo.gov/link/bills/"] = httpx.Response(200, text="<html>Page Not Found</html>")
+    found = asyncio.run(resolve("US", "Civil Rights Act of 1964", use_ai=False))
+    assert found.best == Match("US", "HR 7152 (88th)", "Civil Rights Act of 1964")
+
+    law = "78 STAT. ] PUBLIC LAW 88-352-JULY 2, 1964 " + "An Act to enforce the right to vote. " * 20
+    web[statutes.statute_url(78, 241)] = httpx.Response(200, text=law, headers={"content-type": "text/plain"})
+    fetched = asyncio.run(fetch_bill_text("US", "HR 7152 (88th)"))
+    assert fetched.source == "govinfo"
+    assert fetched.text.startswith("78 STAT.")
+
+
+def test_reads_a_statute_citation_and_skips_margin_notes():
+    from billbreaker.services.statutes import statute_cite
+
+    assert statute_cite("| cite statutes at large = {{usstat|78|241}}") == (78, 241)
+    assert statute_cite("| cite statutes at large = 104 Stat. 327") == (104, 327)
+    assert statute_cite("| introducedbill = H.R. 1") is None
+    text = "This Act may be cited <<NOTE: 26 USC 1 note.>> as the ``Inflation Reduction Act of 2022''."
+    assert bill_find.short_titles(text) == ["Inflation Reduction Act of 2022"]

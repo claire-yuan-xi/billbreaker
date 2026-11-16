@@ -93,7 +93,7 @@ async def _wiki(words: str) -> dict:
         have = [b and await bill_find.on_govinfo(client, *b, 8) for b in bills]
         first = await bill_find._wiki(client, {"action": "parse", "page": titles[0], "prop": "wikitext", "section": "0"}, 8) if titles else {}
     text = (first.get("parse") or {}).get("wikitext") or ""
-    lines = [l[:160] for l in text.splitlines() if re.search(r"introduced|enacted|USBill", l, re.I)][:6]
+    lines = [l[:160] for l in text.splitlines() if re.search(r"introduced|enacted|USBill|statutes|public law", l, re.I)][:6]
     return {"ok": any(have), "titles": titles, "bills": bills, "on_govinfo": have, "first_box": lines}
 
 
