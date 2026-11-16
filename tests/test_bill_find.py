@@ -224,3 +224,29 @@ def test_reads_the_bill_from_an_infobox():
     assert bill_find.wiki_bill(box) == (119, "S", "1582")
     assert bill_find.wiki_bill("| enacted by = 119th\n| introducedbill = S. 1582") == (119, "S", "1582")
     assert bill_find.wiki_bill("no box") is None
+
+
+def test_a_public_law_number_finds_the_bill_it_came_from(web):
+    page = "[Public Law 117-169] &lt;&lt;NOTE: Aug. 16, 2022 - [H.R. 5376]&gt;&gt; This Act may be cited as the ``Inflation Reduction Act of 2022''."
+    web["govinfo.gov/link/plaw/117/public/169?"] = httpx.Response(
+        302, headers={"Location": "https://www.govinfo.gov/content/pkg/PLAW-117publ169/html/PLAW-117publ169.htm"}
+    )
+    web["PLAW-117publ169.htm"] = httpx.Response(200, text=f"<html><pre>{page}</pre></html>")
+    found = asyncio.run(resolve("US", "Public Law 117-169", use_ai=False))
+    assert found.best == Match("US", "HR 5376 (117th)", "Inflation Reduction Act of 2022")
+
+
+def test_an_unknown_public_law_finds_nothing(web):
+    web["govinfo.gov/link/plaw/"] = httpx.Response(200, text="<html>Page Not Found</html>")
+    assert asyncio.run(resolve("US", "P.L. 117-9999", use_ai=False)).best is None
+
+
+def test_a_new_bill_is_found_by_name_from_the_daily_list(web):
+    from billbreaker import db
+
+    asyncio.run(db.execute(
+        "INSERT INTO new_bills (bill_no, title, version, published, on_floor) "
+        "VALUES ('HR 11003', 'Abuse of the Pardon Prevention Act of 2026', 'ih', '2026-11-13', 0)"
+    ))
+    found = asyncio.run(resolve("US", "Abuse of the Pardon Prevention Act", use_ai=False))
+    assert found.best == Match("US", "HR 11003", "Abuse of the Pardon Prevention Act of 2026")

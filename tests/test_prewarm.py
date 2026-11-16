@@ -1,7 +1,7 @@
 import asyncio
 
-from billbreaker.api import explain as explain_api
-from billbreaker.services import analysis_cache, bill_views, prewarm
+from billbreaker import db
+from billbreaker.services import analysis_cache, bill_views, new_bills, prewarm
 from billbreaker.services.ai_client import AIError
 from billbreaker.services.bill_sources import FetchResult
 
@@ -63,16 +63,42 @@ def test_stops_when_the_ai_limit_is_reached(monkeypatch):
     assert asyncio.run(prewarm.run()) == [{"bill": "US HR 1", "status": "RATE_LIMIT"}]
 
 
+def no_new_bills(monkeypatch):
+    async def listed():
+        return {"printed": 0, "house_floor": 0}
+
+    monkeypatch.setattr(new_bills, "refresh", listed)
+
+
 def test_cron_route_runs_once_per_day(client, monkeypatch):
     fake_sources(monkeypatch, [])
+    no_new_bills(monkeypatch)
     first = client.get("/api/cron/prewarm").json()
     second = client.get("/api/cron/prewarm").json()
-    assert first == {"ok": True, "results": []}
+    assert first == {"ok": True, "new_bills": {"printed": 0, "house_floor": 0}, "results": []}
     assert second["skipped"] == "ran recently"
 
 
-def test_cron_route_checks_the_secret_when_set(client, set_setting):
+def test_cron_route_checks_the_secret_when_set(client, set_setting, monkeypatch):
+    no_new_bills(monkeypatch)
     set_setting("cron_secret", "s3cret")
     assert client.get("/api/cron/prewarm").status_code == 401
     ok = client.get("/api/cron/prewarm", headers={"Authorization": "Bearer s3cret"})
     assert ok.status_code == 200
+
+
+def floor_bill(bill_no):
+    asyncio.run(db.execute(
+        "INSERT INTO new_bills (bill_no, title, version, published, on_floor) VALUES (?, 'T', 'eh', '2026-11-16', 1)",
+        (bill_no,),
+    ))
+
+
+def test_floor_bills_come_first_and_are_rewritten_only_when_their_text_changes(monkeypatch):
+    calls = []
+    fake_sources(monkeypatch, calls)
+    asyncio.run(bill_views.count("US", "HR 1"))
+    floor_bill("HR 7254")
+    first = asyncio.run(prewarm.run())
+    assert [r["bill"] for r in first] == ["US HR 7254", "US HR 1"]
+    assert asyncio.run(prewarm.run()) == [{"bill": "US HR 7254", "status": "current"}]

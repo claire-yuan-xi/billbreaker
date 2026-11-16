@@ -74,6 +74,14 @@ async def _save_quietly(*args) -> None:
         log.error("cache save failed: %s", exc)
 
 
+async def _recent(state: str, bill_no: str) -> dict | None:
+    try:
+        return await analysis_cache.load_recent(state, bill_no)
+    except Exception as exc:  # noqa: BLE001 - the normal path still works
+        log.error("recent lookup failed: %s", exc)
+        return None
+
+
 @router.post("/api/explain-bill")
 async def explain_bill(request: Request):
     try:
@@ -114,9 +122,15 @@ async def explain_bill(request: Request):
     source_url = source = None
     tried: list[str] = []
     research = False
+    recent = None
     if len(text.strip()) < MIN_PASTED:
         if not bill_no:
             return error(400, "Paste the bill text on the Paste tab to analyze it.")
+        recent = await _recent(state, bill_no)
+    if recent:
+        # Made in the last day: no need to fetch the bill again to know it is current.
+        text, source = f"recent:{state}:{bill_no}", recent.get("source")
+    elif len(text.strip()) < MIN_PASTED:
         fetched = await fetch_bill_text(state, bill_no)
         tried = fetched.tried
         if fetched.text:
@@ -159,11 +173,12 @@ async def explain_bill(request: Request):
         await bill_views.count(state, bill_no)
 
     # 1) Cache hit: free to anyone, no rate limit.
-    try:
-        cached = await analysis_cache.load_fresh(state, cache_bill, text_hash)
-    except Exception as exc:  # noqa: BLE001
-        log.error("cache lookup failed: %s", exc)
-        cached = None
+    cached = recent
+    if not cached:
+        try:
+            cached = await analysis_cache.load_fresh(state, cache_bill, text_hash)
+        except Exception as exc:  # noqa: BLE001
+            log.error("cache lookup failed: %s", exc)
     if cached:
         if as_json:
             mine = await for_you(cached["title"], cached["sections"])
@@ -230,7 +245,7 @@ async def explain_bill(request: Request):
                 mine = await for_you(payload.get("title") or identifier, payload.get("sections", []))
                 return JSONResponse(_flat(payload, mine, **flags, **source_meta), headers={"Cache-Control": "no-store"})
             return JSONResponse({"error": _friendly(code)}, status_code=503)
-        await _save_quietly(state, cache_bill, text_hash, title, source_url, sections)
+        await _save_quietly(state, cache_bill, text_hash, title, source_url, sections, source)
         payload = {"title": title, "sourceUrl": source_url, "sections": sections}
         mine = await for_you(title, sections)
         return JSONResponse(_flat(payload, mine, cached=False, **source_meta), headers={"Cache-Control": "no-store"})
@@ -259,7 +274,7 @@ async def explain_bill(request: Request):
         yield sse("meta", {"title": title, "sourceUrl": source_url, "cached": False, **source_meta})
         for s in sections:
             yield section_event(s["event"], s["data"])
-        await _save_quietly(state, cache_bill, text_hash, title, source_url, sections)
+        await _save_quietly(state, cache_bill, text_hash, title, source_url, sections, source)
         async for event in for_you_events(title, sections):
             yield event
         yield sse("done", {"cached": False})

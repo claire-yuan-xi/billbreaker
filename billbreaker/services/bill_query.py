@@ -38,6 +38,8 @@ NAMES = sorted(((name.upper(), code) for code, name in STATE_NAMES.items() if co
 FILLER = re.compile(r"\b(?:BILL|STATE|NO|NUMBER|NUM)\b\.?|#")
 YEAR = re.compile(r"\b(?:19|20)\d\d\b")
 NUMBER_ONLY = re.compile(r"0*(\d{1,6})([A-Z]?)")
+# "Public Law 117-169", "Pub. L. 117-169", "P.L. 117-169": an enacted law by its own number.
+PUBLIC_LAW = re.compile(r"^(?:PUBLIC\s+LAW|PUB\.?\s*L\.?|P\.?\s*L\.?)\s*(?:NO\.?\s*)?(\d{2,3})\s*[-\u2013]\s*(\d{1,4})$")
 CONGRESS = re.compile(r"\b(\d{2,3})(?:ST|ND|RD|TH)\b(?:\s+CONGRESS\b)?")
 
 
@@ -48,6 +50,7 @@ class Query:
     number: str = ""  # "1245" when only a number was typed
     words: str = ""  # the text, when it names a bill instead of numbering it
     congress: int | None = None  # "117th Congress", for an older federal bill
+    law: tuple[int, int] | None = None  # (117, 169) for "Public Law 117-169"
 
 
 def _take_state(text: str, state: str) -> tuple[str, str]:
@@ -80,6 +83,8 @@ def parse_query(state: str, raw: str) -> Query:
     text = " ".join(re.sub(r"[,;:()\[\]]", " ", raw.upper()).split())
     if not text:
         return Query(state)
+    if m := PUBLIC_LAW.match(text):
+        return Query("US", words=" ".join(raw.split())[:120], law=(int(m.group(1)), int(m.group(2))))
     congress = None
     if m := CONGRESS.search(text):
         text = " ".join((text[: m.start()] + " " + text[m.end() :]).split())

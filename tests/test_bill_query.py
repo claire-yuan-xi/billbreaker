@@ -51,3 +51,9 @@ def test_bill_numbers_keep_their_congress():
     assert normalize_bill_no("HR 5376 (117)") == "HR 5376 (117th)"
     assert split_congress("HR 5376 (117th)") == ("HR 5376", 117)
     assert split_congress("HB 12") == ("HB 12", None)
+
+
+@pytest.mark.parametrize("typed", ["Public Law 117-169", "P.L. 117-169", "pub. l. 117-169", "PL 117-169"])
+def test_reads_a_public_law_number(typed):
+    assert parse_query("TX", typed).law == (117, 169)
+    assert parse_query("TX", typed).state == "US"

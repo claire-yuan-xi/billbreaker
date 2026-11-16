@@ -15,20 +15,21 @@ import httpx
 
 from ..config import settings
 from ..states import STATE_NAMES
-from ..validation import normalize_bill_no, with_congress
+from ..validation import normalize_bill_no, split_congress, with_congress
 from .ai_client import call_ai
 from .ai_schemas import BILL_GUESS
 from .bill_query import FEDERAL, Query, parse_query
 from .bill_sources import CONGRESS_CHAMBERS, GOVINFO_TYPES, UA, congresses, current_congress, find_openstates_bill
 from .bill_sources import openstates_jurisdiction
-from .text import strip_html
+from . import new_bills
+from .govinfo import read_head
+from .public_law import law_bill
 from .web_search import search
 
 log = logging.getLogger(__name__)
 
 MAX_MATCHES = 4
 MAX_CHECKS = 4
-HEAD_BYTES = 60_000
 FITS = 0.6
 # Every chamber prefix states use, for a number typed without one (Open States takes up to 20).
 STATE_PREFIXES = (
@@ -117,19 +118,7 @@ async def govinfo_start(client: httpx.AsyncClient, congress: int, prefix: str, n
     if not kind:
         return None
     url = f"https://www.govinfo.gov/link/bills/{congress}/{kind}/{number}?link-type=html"
-    try:
-        async with client.stream("GET", url, timeout=timeout, headers={"User-Agent": UA}) as res:
-            # A missing bill answers 200 on the link page itself, with no package to redirect to.
-            if res.status_code != 200 or "BILLS-" not in str(res.url):
-                return None
-            data = b""
-            async for chunk in res.aiter_bytes():
-                data += chunk
-                if len(data) >= HEAD_BYTES:
-                    break
-    except httpx.HTTPError:
-        return None
-    return strip_html(data.decode("utf-8", "replace"))
+    return await read_head(client, url, "BILLS-", timeout)
 
 
 async def on_govinfo(client: httpx.AsyncClient, congress: int, prefix: str, number: str, timeout: float) -> bool:
@@ -218,6 +207,21 @@ async def _federal_web(client: httpx.AsyncClient, query: Query, timeout: float) 
         if kept:
             return _unique([Match("US", federal_bill(*c[:3]), name) for c, name in kept])
     return []
+
+
+async def _federal_new(client: httpx.AsyncClient, query: Query, timeout: float) -> list[Match]:
+    """Bills printed in the last few months, which Wikipedia and web searches often do not know yet."""
+    try:
+        rows = await new_bills.titled()
+    except Exception as exc:  # noqa: BLE001 - the other sources still run
+        log.warning("new bills lookup failed: %s", type(exc).__name__)
+        return []
+    kept = [
+        r for r in rows
+        if _fits(query.words, r["title"]) and (not query.congress or split_congress(r["bill_no"])[1] == query.congress)
+    ]
+    kept.sort(key=lambda r: -_closeness(query.words, r["title"]))
+    return _unique([Match("US", r["bill_no"], r["title"]) for r in kept[:MAX_MATCHES]])
 
 
 async def _wiki(client: httpx.AsyncClient, params: dict, timeout: float) -> dict:
@@ -376,6 +380,17 @@ async def _guess(client: httpx.AsyncClient, query: Query, timeout: float) -> lis
     return [Match(query.state, bill_no, (bill.get("title") or title).strip())]
 
 
+async def _public_law(client: httpx.AsyncClient, query: Query, timeout: float) -> Match | None:
+    """The bill an enacted law came from; its short title, else the law's number, names it."""
+    found = await law_bill(client, *query.law, timeout)
+    if not found:
+        return None
+    congress, prefix, number, text = found
+    names = short_titles(text)
+    title = names[0] if names else f"Public Law {query.law[0]}-{query.law[1]}"
+    return Match("US", federal_bill(congress, prefix, number), title)
+
+
 async def resolve(state: str, raw: str, use_ai: bool = True, timeout: float = 6) -> Found:
     """The bill a search means, best first, or suggestions when none fits."""
     query = parse_query(state, raw)
@@ -386,12 +401,14 @@ async def resolve(state: str, raw: str, use_ai: bool = True, timeout: float = 6)
     if not (query.bill_no or query.number or query.words):
         return Found(query)
     async with httpx.AsyncClient(follow_redirects=True) as client:
+        if query.law and (law := await _public_law(client, query, timeout)):
+            return Found(query, law)
         if query.bill_no:
             return await _typed_state(client, query, timeout)
         if query.state == "US" and query.words:
             # Wikipedia knows the famous acts; bills that only amend one share its name, so each
             # next source runs until a name matches exactly, and the closest checked name wins.
-            sources = [_federal_wiki, _federal_web] + ([_guess] if use_ai else [])
+            sources = [_federal_new, _federal_wiki, _federal_web] + ([_guess] if use_ai else [])
             matches: list[Match] = []
             for find in sources:
                 if any(_closeness(query.words, m.title) == 1 for m in matches):

@@ -4,6 +4,7 @@ GovInfo then Congress.gov for federal bills, OpenStates for state bills, then a
 web search for either.
 """
 
+import asyncio
 import re
 import time
 from dataclasses import dataclass, field
@@ -106,17 +107,22 @@ async def fetch_govinfo_text(client: httpx.AsyncClient, bill_no: str, timeout: f
     pattern = bill_pattern(bill_no)
     if not kind or not pattern:
         return None
-    for c in congresses(congress):
+
+    async def one(c: int):
         url = f"https://www.govinfo.gov/link/bills/{c}/{kind}/{parsed[1]}?link-type=html"
         res = await _get(client, url, timeout)
         if not res or res.status_code != 200:
-            continue
+            return None
         text = strip_html(res.text)
         # A missing bill still answers 200 with a "Page Not Found" page.
         if len(text) > MIN_CHARS and pattern.search(text[:3000]):
             pkg = re.search(r"BILLS-[0-9a-z]+", str(res.url))
             return text, f"https://www.govinfo.gov/app/details/{pkg.group(0)}" if pkg else url
-    return None
+        return None
+
+    # This Congress and the last are asked at once; this one wins when both have the number.
+    found = await asyncio.gather(*(one(c) for c in congresses(congress)))
+    return next((f for f in found if f), None)
 
 
 def _openstates_target_ok(url: str) -> bool:

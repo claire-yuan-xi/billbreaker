@@ -1,11 +1,14 @@
 """GET /api/cron/prewarm: run once a day by Vercel Cron (see vercel.json)."""
 
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 
 from ..config import settings
-from ..services import prewarm
+from ..services import new_bills, prewarm
 
+log = logging.getLogger(__name__)
 router = APIRouter()
 
 
@@ -16,4 +19,9 @@ async def prewarm_popular(request: Request):
         return JSONResponse({"error": "Unauthorized"}, status_code=401)
     if not await prewarm.claim_run():
         return {"ok": True, "skipped": "ran recently"}
-    return {"ok": True, "results": await prewarm.run()}
+    try:
+        listed = await new_bills.refresh()
+    except Exception as exc:  # noqa: BLE001 - the refresh of known bills still runs
+        log.error("new bills refresh failed: %s", type(exc).__name__)
+        listed = {"error": type(exc).__name__}
+    return {"ok": True, "new_bills": listed, "results": await prewarm.run()}

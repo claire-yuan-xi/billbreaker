@@ -22,6 +22,7 @@ NATIVE_URL = "https://generativelanguage.googleapis.com/v1beta/models/{model}:ge
 TRY_NEXT_MODEL = {404, 429, 500, 503}
 MAX_WAIT = 20
 FIRST_TRY_S = 30
+REASONING_EFFORT = "low"
 _transport: httpx.AsyncBaseTransport | None = None  # tests swap in a fake Gemini
 
 Send = Callable[[httpx.AsyncClient, str], Awaitable[httpx.Response]]
@@ -119,17 +120,29 @@ async def _run(send: Send, light: bool = False) -> tuple[httpx.Response, str]:
     raise AIError("AI_GATEWAY_ERROR")
 
 
+def _rejects_effort(res: httpx.Response) -> bool:
+    """A model that cannot lower its thinking says so with a 400 naming the setting."""
+    return res.status_code == 400 and bool(re.search(r"reasoning|thinking", res.text, re.I))
+
+
 async def call_ai(system: str, user: str, schema: dict, light: bool = False) -> dict:
     """One forced function call; returns its arguments."""
 
-    def send(client: httpx.AsyncClient, model: str):
+    async def send(client: httpx.AsyncClient, model: str):
         body = {
             "model": model,
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "tools": [{"type": "function", "function": schema}],
             "tool_choice": {"type": "function", "function": {"name": schema["name"]}},
+            # Filling in a fixed form needs little thinking, and thinking is most of the wait.
+            "reasoning_effort": REASONING_EFFORT,
         }
-        return _post(client, OPENAI_URL, body, model)
+        res = await _post(client, OPENAI_URL, body, model)
+        if _rejects_effort(res):
+            log.warning("Gemini %s refused reasoning_effort, sending without it", model)
+            body.pop("reasoning_effort")
+            res = await _post(client, OPENAI_URL, body, model)
+        return res
 
     res, model = await _run(send, light)
     try:

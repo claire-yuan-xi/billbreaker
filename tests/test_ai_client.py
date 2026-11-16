@@ -131,3 +131,19 @@ def test_a_model_that_hangs_gives_the_next_one_a_turn(monkeypatch, set_setting):
 
     monkeypatch.setattr(ai_client, "_transport", httpx.MockTransport(handler))
     assert asyncio.run(ai_client.call_ai("s", "u", SCHEMA)) == {"ok": 1}
+
+
+def test_asks_for_low_thinking_and_drops_it_when_refused(monkeypatch, set_setting):
+    bodies = []
+
+    def handler(req, n):
+        bodies.append(json.loads(req.content))
+        if n == 1:
+            return httpx.Response(400, text='{"error": {"message": "reasoning_effort is not supported"}}')
+        return reply({"ok": 3})
+
+    seen = gemini(monkeypatch, set_setting, handler)
+    assert asyncio.run(ai_client.call_ai("s", "u", SCHEMA)) == {"ok": 3}
+    assert seen == ["main-model", "main-model"]
+    assert bodies[0]["reasoning_effort"] == "low"
+    assert "reasoning_effort" not in bodies[1]

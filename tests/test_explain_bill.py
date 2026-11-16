@@ -110,6 +110,19 @@ def test_fetches_the_text_when_none_is_pasted(client, monkeypatch):
     assert body["source"] == "congress.gov"
 
 
+def test_a_breakdown_from_today_skips_the_text_fetch(client, monkeypatch):
+    async def no_fetch(state, bill_no):
+        raise AssertionError("fetched again")
+
+    monkeypatch.setattr(explain_api, "fetch_bill_text", no_fetch)
+    sections = [{"event": "quick_take", "data": QUICK}]
+    asyncio.run(analysis_cache.save("US", "HR 1", "h", "Recent", "https://g", sections, "govinfo"))
+    body = post(client, text="", mode="json").json()
+    assert body["title"] == "Recent"
+    assert body["source"] == "govinfo"
+    assert body["cached"] is True
+
+
 def test_a_state_bill_with_no_text_is_looked_up_on_the_web(client, monkeypatch):
     async def no_text(state, bill_no):
         return FetchResult(None, None, None, ["openstates"])

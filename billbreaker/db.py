@@ -67,6 +67,13 @@ CREATE TABLE IF NOT EXISTS bill_views (
   last_viewed TEXT NOT NULL,
   PRIMARY KEY (state, bill_no)
 );
+CREATE TABLE IF NOT EXISTS new_bills (
+  bill_no TEXT PRIMARY KEY,
+  title TEXT NOT NULL,
+  version TEXT NOT NULL,
+  published TEXT NOT NULL,
+  on_floor INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS device_watchlist (
   device_id TEXT NOT NULL,
   state TEXT NOT NULL,
