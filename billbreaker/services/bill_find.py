@@ -455,7 +455,7 @@ async def resolve(state: str, raw: str, use_ai: bool = True, timeout: float = 6)
 def describe(found: Found) -> dict:
     """The JSON the bill page reads."""
     def row(m: Match) -> dict:
-        return {"state": m.state, "billNo": m.bill_no, "title": m.title}
+        return {"state": m.state, "billNo": m.bill_no, "title": " ".join(m.title.split())}
 
     return {
         "found": found.best is not None,
