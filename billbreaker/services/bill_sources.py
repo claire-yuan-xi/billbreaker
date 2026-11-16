@@ -230,7 +230,10 @@ async def fetch_bill_text(state: str, bill_no: str, budget: float = 25, tier_tim
         ]
     else:
         tiers = [("openstates", lambda c, t: fetch_openstates_text(c, state, bill_no, t))]
-    tiers.append(("web", lambda c, t: fetch_web_text(c, state, bill_no, t)))
+    # Pages found by a web search only name the number, which every Congress reuses, so an older
+    # Congress's bill would be matched to a newer one with the same number.
+    if not (state == "US" and split_congress(bill_no)[1]):
+        tiers.append(("web", lambda c, t: fetch_web_text(c, state, bill_no, t)))
 
     async with httpx.AsyncClient(follow_redirects=True) as client:
         for name, run in tiers:

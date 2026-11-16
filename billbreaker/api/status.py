@@ -65,7 +65,10 @@ async def _bill(state: str, bill: str) -> dict:
         title, sections = await breakdown(fetched.text, f"{state} {bill}")
         return {**_summary(title, sections), "source": fetched.source, "chars": len(fetched.text)}
     jurisdiction = "US federal" if state == "US" else STATE_NAMES.get(state, state)
-    found = await research_breakdown(jurisdiction, bill, f"{state} {bill}")
+    try:
+        found = await research_breakdown(jurisdiction, bill, f"{state} {bill}")
+    except AIError as exc:
+        return {"ok": False, "error": exc.code, "detail": exc.detail, "tried": fetched.tried}
     if not found:
         return {"ok": False, "error": "NOT_FOUND", "tried": fetched.tried}
     return {**_summary(*found[:2]), "source": "web", "tried": fetched.tried}
