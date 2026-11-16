@@ -27,7 +27,7 @@ from ..services.explain import breakdown
 from ..services.for_you import tailor
 from ..services.rate_limit import bump, client_ip
 from ..services.research import research_breakdown
-from ..services.statutes import statute_cite
+from ..services.statutes import saved_link, statute_cite
 from ..services.web_search import search
 from ..states import STATE_NAMES
 from ..validation import normalize_bill_no
@@ -159,6 +159,7 @@ async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
             "chars": len(text),
             "start": text[:300],
             "tried": fetched.tried,
+            "statute_link": await saved_link(bill) if state == "US" else None,
         }
     if kind == "openstates":
         async with httpx.AsyncClient(follow_redirects=True) as client:

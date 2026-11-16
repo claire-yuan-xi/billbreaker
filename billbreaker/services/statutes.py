@@ -17,6 +17,8 @@ CITE_LINE = re.compile(r"statutes[ _]at[ _]large\s*=([^\n]*)", re.I)
 USSTAT = re.compile(r"\{\{\s*usstat\s*\|\s*(\d{1,3})\s*\|\s*(\d{1,5})", re.I)
 PLAIN = re.compile(r"\b(\d{1,3})\s*Stat\.?\s*(\d{1,5})\b")
 MIN_CHARS = 400
+# Scanned volumes are large: the ADA's pages are well over the usual 8 MB limit.
+MAX_BYTES = 40_000_000
 
 
 def statute_cite(wikitext: str) -> tuple[int, int] | None:
@@ -40,11 +42,16 @@ async def remember(bill_no: str, volume: int, page: int) -> None:
     )
 
 
+async def saved_link(bill_no: str) -> str | None:
+    row = await db.query_one("SELECT url FROM statute_links WHERE bill_no = ?", (bill_no,))
+    return row["url"] if row else None
+
+
 async def fetch_statute_text(client: httpx.AsyncClient, bill_no: str, timeout: float):
     """The law's printed text, when a search saved where it is."""
-    row = await db.query_one("SELECT url FROM statute_links WHERE bill_no = ?", (bill_no,))
-    if not row:
+    url = await saved_link(bill_no)
+    if not url:
         return None
     # Old printed volumes are scanned PDFs, so they need longer than a web page.
-    doc = await read_document(client, row["url"], max(timeout, 15))
-    return (doc.text, row["url"]) if len(doc.text) >= MIN_CHARS else None
+    doc = await read_document(client, url, max(timeout, 20), MAX_BYTES)
+    return (doc.text, url) if len(doc.text) >= MIN_CHARS else None

@@ -34,7 +34,7 @@ def pdf_text(data: bytes) -> str:
         return ""
 
 
-async def read_document(client: httpx.AsyncClient, url: str, timeout: float) -> Document:
+async def read_document(client: httpx.AsyncClient, url: str, timeout: float, max_bytes: int = MAX_BYTES) -> Document:
     """The document's text, and its HTML when it is a page; empty when unreadable."""
     try:
         res = await client.get(
@@ -43,7 +43,7 @@ async def read_document(client: httpx.AsyncClient, url: str, timeout: float) -> 
     except httpx.HTTPError:
         return Document(url=url)
     final, status = str(res.url), res.status_code
-    if status != 200 or len(res.content) > MAX_BYTES:
+    if status != 200 or len(res.content) > max_bytes:
         return Document(url=final, status=status)
     kind = res.headers.get("content-type", "").lower()
     if "pdf" in kind or res.content[:5] == b"%PDF-":
