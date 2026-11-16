@@ -20,6 +20,12 @@ sleeps, and share links and cached breakdowns are kept.
 The tables are created on the first request, so there is nothing to set up
 in Turso.
 
+If `/api/status?check=db` shows a new fingerprint and empty tables after every
+deploy, the Turso integration is giving each deploy its own database. Pin one:
+in the Turso dashboard open the database, copy its URL and create a token, then
+in Vercel add `BILLBREAKER_TURSO_URL` and `BILLBREAKER_TURSO_TOKEN` for
+Production and redeploy. These win over the integration's own two settings.
+
 ## Move billbreaker.org
 
 Do this only once the vercel.app link works.

@@ -44,8 +44,10 @@ def load_settings() -> Settings:
         gemini_fallback_model=os.getenv("GEMINI_FALLBACK_MODEL", "gemini-3.5-flash-lite"),
         openstates_api_key=os.getenv("OPENSTATES_API_KEY", ""),
         database_path=Path(os.getenv("DATABASE_PATH", "") or _default_db()),
-        turso_url=os.getenv("TURSO_DATABASE_URL", ""),
-        turso_token=os.getenv("TURSO_AUTH_TOKEN", ""),
+        # The Turso integration on Vercel can hand each deploy a new empty database through
+        # TURSO_DATABASE_URL; these two names, set by hand, pin one database that keeps its data.
+        turso_url=os.getenv("BILLBREAKER_TURSO_URL") or os.getenv("TURSO_DATABASE_URL", ""),
+        turso_token=os.getenv("BILLBREAKER_TURSO_TOKEN") or os.getenv("TURSO_AUTH_TOKEN", ""),
         cloud_sync=_flag("CLOUD_SYNC"),
         abuse_admin_token=os.getenv("ABUSE_ADMIN_TOKEN", ""),
         abuse_alert_webhook_url=os.getenv("ABUSE_ALERT_WEBHOOK_URL", ""),
