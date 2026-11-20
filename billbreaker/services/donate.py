@@ -27,6 +27,8 @@ async def checkout_url(dollars: int, site: str) -> str:
     form = {
         "mode": "payment",
         "submit_type": "donate",
+        # Managed Payments only takes digital products with a tax code; a donation is neither.
+        "managed_payments[enabled]": "false",
         "line_items[0][quantity]": "1",
         "line_items[0][price_data][currency]": "usd",
         "line_items[0][price_data][unit_amount]": str(dollars * 100),
