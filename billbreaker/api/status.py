@@ -17,7 +17,7 @@ from fastapi.responses import JSONResponse
 
 from .. import db
 from ..config import settings
-from ..services import ai_client, bill_find, new_bills, visits
+from ..services import ai_client, bill_find, donate, new_bills, visits
 from ..services.ai_client import AIError
 from ..services.bill_find import describe, resolve
 from ..services.bill_sources import openstates_links, fetch_bill_text, find_openstates_bill
@@ -51,7 +51,7 @@ _cache: dict[str, tuple[float, dict]] = {}
 _running: dict[str, asyncio.Task] = {}
 
 
-CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve", "wiki", "db", "newbills")
+CHECKS = ("ai", "breakdown", "foryou", "research", "fetch", "openstates", "search", "bill", "resolve", "wiki", "db", "newbills", "donate")
 
 
 def _summary(title: str, sections: list[dict]) -> dict:
@@ -125,6 +125,8 @@ async def _db() -> dict:
         "ok": True,
         "backend": "turso" if host else "local",
         "fingerprint": hashlib.sha256(host.encode()).hexdigest()[:10] if host else None,
+        # True when the hand-set BILLBREAKER_TURSO_URL is the one in use, not the integration's.
+        "pinned": bool(os.getenv("BILLBREAKER_TURSO_URL")) and settings.turso_url == os.getenv("BILLBREAKER_TURSO_URL"),
         "tables": tables,
         "counters": {r["name"]: r["value"] for r in counters},
         # Names only, never values: shows when a host integration sets its own database per deploy.
@@ -132,9 +134,19 @@ async def _db() -> dict:
     }
 
 
+async def _donate() -> dict:
+    """Opens a $1 Checkout session (nothing is charged; it expires unpaid) to prove the Stripe key works."""
+    if not donate.enabled():
+        return {"ok": False, "error": "STRIPE_SECRET_KEY not set"}
+    url = await donate.checkout_url(1, "https://billbreaker.org")
+    return {"ok": True, "host": urlparse(url).hostname, "live": settings.stripe_secret_key.startswith("sk_live")}
+
+
 async def _run(kind: str, state: str, bill: str, query: str = "") -> dict:
     if kind == "db":
         return await _db()
+    if kind == "donate":
+        return await _donate()
     if kind == "newbills":
         feed, house = await new_bills.read_sources()
         return {

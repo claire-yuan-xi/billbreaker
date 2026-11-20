@@ -23,3 +23,18 @@ def test_the_db_check_dates_the_data_without_showing_the_address(client):
     body = client.get("/api/status?check=db").json()["db"]
     assert body["backend"] == "local" and body["counters"] == {"visits": 1}
     assert set(body["tables"]) >= {"bill_analyses", "shared_analyses", "abuse_events"}
+
+
+def test_the_donate_check_opens_checkout_without_showing_the_key(client, set_setting, monkeypatch):
+    from billbreaker.services import donate
+
+    set_setting("stripe_secret_key", "sk_test_secret")
+
+    async def fake(dollars, site):
+        return "https://checkout.stripe.com/c/pay/cs_test_1"
+
+    monkeypatch.setattr(donate, "checkout_url", fake)
+    res = client.get("/api/status?check=donate")
+    out = res.json()["donate"]
+    assert out["ok"] is True and out["host"] == "checkout.stripe.com" and out["live"] is False
+    assert "sk_test_secret" not in res.text
