@@ -1,5 +1,7 @@
 """Stripe Checkout for one-time donations. Checkout shows Apple Pay, Google Pay and card on its own."""
 
+import re
+
 import httpx
 
 from ..config import settings
@@ -34,7 +36,11 @@ async def checkout_url(dollars: int, site: str) -> str:
     }
     async with httpx.AsyncClient(timeout=15) as client:
         res = await client.post(CHECKOUT_URL, data=form, auth=(settings.stripe_secret_key, ""))
-    url = res.json().get("url") if res.is_success else None
+    body = res.json() if res.headers.get("content-type", "").startswith("application/json") else {}
+    url = body.get("url") if res.is_success else None
     if not url:
-        raise DonateError("Payment page did not open")
+        # Stripe's own reason (never the key), so the status check shows what to fix.
+        reason = (body.get("error") or {}).get("message") or f"HTTP {res.status_code}"
+        reason = re.sub(r"\b[sr]k_\w*\**\w*", "[key]", reason)[:300]
+        raise DonateError(f"Payment page did not open: {reason}")
     return url

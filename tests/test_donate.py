@@ -45,3 +45,24 @@ def test_thanks_page(client):
 
 def test_amounts_are_fixed():
     assert donate.AMOUNTS == (1, 2, 5, 10)
+
+
+def test_stripe_reason_is_kept_without_the_key(set_setting, monkeypatch):
+    import asyncio
+
+    import httpx
+    import pytest
+
+    from billbreaker.services import donate
+
+    set_setting("stripe_secret_key", "sk_live_abc")
+
+    def reply(request):
+        msg = "Invalid API Key provided: sk_live_****abcd"
+        return httpx.Response(401, json={"error": {"message": msg}})
+
+    real = httpx.AsyncClient
+    monkeypatch.setattr(donate.httpx, "AsyncClient", lambda **kw: real(transport=httpx.MockTransport(reply), **kw))
+    with pytest.raises(donate.DonateError) as err:
+        asyncio.run(donate.checkout_url(1, "https://billbreaker.org"))
+    assert "Invalid API Key provided" in str(err.value) and "abcd" not in str(err.value)
