@@ -5,6 +5,7 @@ from pathlib import Path
 
 from fastapi.templating import Jinja2Templates
 
+from .config import settings
 from .reader_questions import QUESTIONS
 from .services.links import host_of, is_safe_external_url
 from .states import STATE_NAMES, STATES
@@ -18,5 +19,6 @@ env.globals.update(
     QUESTIONS=QUESTIONS,
     is_safe_external_url=is_safe_external_url,
     host_of=host_of,
+    donations_open=lambda: settings.donations_open,
 )
 env.filters["tojson_attr"] = lambda value: json.dumps(value)

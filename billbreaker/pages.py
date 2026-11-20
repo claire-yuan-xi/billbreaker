@@ -1,8 +1,9 @@
 """HTML pages."""
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import HTMLResponse
 
+from .config import settings
 from .ml import notebook_run as run
 from .ml.claims_check import FLAG_LABELS, SERIOUS, check_claims, serious_count
 from .ml.profile_terms import clean_profile, profile_terms
@@ -38,6 +39,8 @@ async def shared(request: Request, slug: str):
 
 @router.get("/donate", response_class=HTMLResponse)
 async def donate_page(request: Request, thanks: str = "", error: str = ""):
+    if not settings.donations_open:
+        raise HTTPException(status_code=404)
     context = {"amounts": donate.AMOUNTS, "thanks": bool(thanks), "error": error, "open": donate.enabled()}
     return templates.TemplateResponse(request, "donate.html", context)
 

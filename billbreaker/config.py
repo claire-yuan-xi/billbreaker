@@ -30,6 +30,7 @@ class Settings:
     abuse_alert_cooldown_s: int
     cron_secret: str
     stripe_secret_key: str
+    donations_open: bool
 
 
 def _default_db() -> str:
@@ -55,6 +56,8 @@ def load_settings() -> Settings:
         abuse_alert_cooldown_s=max(60, int(os.getenv("ABUSE_ALERT_COOLDOWN_S", "3600") or 3600)),
         cron_secret=os.getenv("CRON_SECRET", ""),
         stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", ""),
+        # Donations stay hidden (no header link, /donate is a 404) until DONATIONS_OPEN=on.
+        donations_open=_flag("DONATIONS_OPEN"),
     )
 
 

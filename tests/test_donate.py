@@ -1,5 +1,19 @@
+import pytest
+
 from billbreaker.config import settings
 from billbreaker.services import donate
+
+
+@pytest.fixture(autouse=True)
+def donations_on(set_setting):
+    set_setting("donations_open", True)
+
+
+def test_donate_is_hidden_until_turned_on(client, set_setting):
+    set_setting("donations_open", False)
+    assert client.get("/donate").status_code == 404
+    assert client.post("/donate", data={"amount": "5"}).status_code == 404
+    assert 'href="/donate"' not in client.get("/").text
 
 
 def test_donate_page_shows_amounts_and_header_link(client):

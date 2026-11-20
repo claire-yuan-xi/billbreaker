@@ -2,9 +2,10 @@
 
 import logging
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, HTTPException, Request
 from fastapi.responses import RedirectResponse
 
+from ..config import settings
 from ..services.donate import DonateError, checkout_url
 from ..services.rate_limit import bump, client_ip
 
@@ -19,6 +20,8 @@ def _site(request: Request) -> str:
 
 @router.post("/donate")
 async def donate(request: Request, amount: int = Form(...)):
+    if not settings.donations_open:
+        raise HTTPException(status_code=404)
     if not (await bump(f"ip:{client_ip(request)}:donate:1h", 20, 3600, endpoint="donate")).allowed:
         return RedirectResponse("/donate?error=busy", status_code=303)
     try:
